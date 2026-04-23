@@ -71,6 +71,28 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// NUEVA RUTA: Obtener perfil por email
+app.get('/api/perfil/:email', async (req, res) => {
+    try {
+        const user = await User.findOne({ email: req.params.email.trim() });
+        if (user) {
+            res.status(200).send({
+                nombres: user.nombre,       // Mapeamos 'nombre' a 'nombres' para Android
+                apellidos: user.apellidos,
+                email: user.email,
+                telefono: user.telefono,
+                empresa: user.nombreEmpresa, // Mapeamos 'nombreEmpresa' a 'empresa'
+                rol: user.rol
+            });
+        } else {
+            res.status(404).send({ error: "Usuario no encontrado" });
+        }
+    } catch (error) {
+        res.status(500).send({ error: "Error en el servidor" });
+    }
+});
+
+
 // Configuración del Puerto para Render o Local
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
