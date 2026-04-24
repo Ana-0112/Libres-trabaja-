@@ -146,6 +146,26 @@ app.get('/api/perfil/:email', async (req, res) => {
     }
 });
 
+router.put('/api/perfil/update', async (req, res) => {
+    const { email, telefono, fotoPerfil, curriculumUrl } = req.body;
+    try {
+        const usuarioActualizado = await Usuario.findOneAndUpdate(
+            { email: email },
+            { 
+                $set: { 
+                    telefono: telefono,
+                    fotoPerfil: fotoPerfil,
+                    curriculumUrl: curriculumUrl
+                } 
+            },
+            { new: true }
+        );
+        res.status(200).json(usuarioActualizado);
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar Atlas" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
