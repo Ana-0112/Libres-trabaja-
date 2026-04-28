@@ -14,7 +14,9 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log("Conexión exitosa a MongoDB Atlas"))
     .catch(err => console.error("Error de conexión:", err));
 
-// --- MODELO DE USUARIO ---
+// --- MODELOS DE DATOS ---
+
+// Modelo de Usuario
 const UserSchema = new mongoose.Schema({
     nombre: String,
     apellidos: String,
@@ -29,11 +31,24 @@ const UserSchema = new mongoose.Schema({
     fotoPerfil: { type: String, default: "" },
     cvUrl: { type: String, default: "" }
 });
-
 const User = mongoose.model('User', UserSchema);
 
-// --- CONFIGURACIÓN DE NODEMAILER (GMAIL) ---
-// Usamos las variables seguras de tu .env
+// Modelo de Vacante
+const VacanteSchema = new mongoose.Schema({
+    empresa: String,
+    puesto: String,
+    sueldo: String,
+    sector: String,
+    reclutadorEmail: String,
+    postulantes: [{ 
+        emailCandidato: String, 
+        nombreCandidato: String,
+        status: { type: String, default: 'Nuevo' }
+    }]
+});
+const Vacante = mongoose.model('Vacante', VacanteSchema);
+
+// --- CONFIGURACIÓN DE NODEMAILER ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -42,7 +57,9 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// --- RUTA: REGISTRO ---
+// --- RUTAS ---
+
+// Registro
 app.post('/api/register', async (req, res) => {
     try {
         const user = new User(req.body);
@@ -53,7 +70,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// --- RUTA: LOGIN ---
+// Login
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -73,16 +90,12 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- RUTA: ENVIAR CÓDIGO POR EMAIL ---
+// Enviar Código
 app.post('/api/enviar-codigo-email', async (req, res) => {
     const { email } = req.body;
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-
     try {
-        // 1. Guardar código en la DB
         await User.findOneAndUpdate({ email: email.trim() }, { codigoVerificacion: codigo });
-
-        // 2. Definir opciones del correo aquí adentro (donde 'email' sí existe)
         const mailOptions = {
             from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
             to: email,
@@ -96,21 +109,18 @@ app.post('/api/enviar-codigo-email', async (req, res) => {
                 </div>
             `
         };
-
         await transporter.sendMail(mailOptions);
         res.status(200).json({ message: 'Código enviado con éxito' });
     } catch (error) {
-        console.error("Error al enviar email:", error);
         res.status(500).json({ error: 'Error al enviar el correo' });
     }
 });
 
-// --- RUTA: VALIDAR EL CÓDIGO ---
+// Verificar Código
 app.post('/api/verificar-codigo', async (req, res) => {
     const { email, codigoIngresado } = req.body;
     try {
         const user = await User.findOne({ email: email.trim() });
-        
         if (user && user.codigoVerificacion === codigoIngresado) {
             user.verificado = true;
             user.codigoVerificacion = null; 
@@ -124,10 +134,10 @@ app.post('/api/verificar-codigo', async (req, res) => {
     }
 });
 
-// Ruta para crear vacante en MongoDB
-router.post('/api/vacantes', async (req, res) => {
+// Crear Vacante (Corregido de router a app)
+app.post('/api/vacantes', async (req, res) => {
     try {
-        const nuevaVacante = new Vacante(req.body); // Vacante es tu modelo de Mongoose
+        const nuevaVacante = new Vacante(req.body);
         await nuevaVacante.save();
         res.status(201).send({ message: "Vacante creada exitosamente" });
     } catch (error) {
@@ -135,7 +145,7 @@ router.post('/api/vacantes', async (req, res) => {
     }
 });
 
-// --- RUTA: OBTENER PERFIL ---
+// Obtener Perfil
 app.get('/api/perfil/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email.trim() });
@@ -157,16 +167,17 @@ app.get('/api/perfil/:email', async (req, res) => {
     }
 });
 
-router.put('/api/perfil/update', async (req, res) => {
+// Actualizar Perfil (Corregido de router a app y de Usuario a User)
+app.put('/api/perfil/update', async (req, res) => {
     const { email, telefono, fotoPerfil, curriculumUrl } = req.body;
     try {
-        const usuarioActualizado = await Usuario.findOneAndUpdate(
+        const usuarioActualizado = await User.findOneAndUpdate(
             { email: email },
             { 
                 $set: { 
                     telefono: telefono,
                     fotoPerfil: fotoPerfil,
-                    curriculumUrl: curriculumUrl
+                    cvUrl: curriculumUrl // Cambiado para coincidir con el Schema
                 } 
             },
             { new: true }
@@ -177,29 +188,7 @@ router.put('/api/perfil/update', async (req, res) => {
     }
 });
 
-// Modelo de Vacante
-const VacanteSchema = new mongoose.Schema({
-    empresa: String,
-    puesto: String,
-    sueldo: String,
-    sector: String,
-    reclutadorEmail: String,
-    postulantes: [{ 
-        emailCandidato: String, 
-        nombreCandidato: String,
-        status: { type: String, default: 'Nuevo' }
-    }]
-});
-
-const Vacante = mongoose.model('Vacante', VacanteSchema);
-
-// Endpoint para crear vacante
-router.post('/api/vacantes', async (req, res) => {
-    const nuevaVacante = new Vacante(req.body);
-    await nuevaVacante.save();
-    res.status(201).json({ message: "Vacante publicada" });
-});
-
+// --- INICIO DEL SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
