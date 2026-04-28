@@ -124,6 +124,17 @@ app.post('/api/verificar-codigo', async (req, res) => {
     }
 });
 
+// Ruta para crear vacante en MongoDB
+router.post('/api/vacantes', async (req, res) => {
+    try {
+        const nuevaVacante = new Vacante(req.body); // Vacante es tu modelo de Mongoose
+        await nuevaVacante.save();
+        res.status(201).send({ message: "Vacante creada exitosamente" });
+    } catch (error) {
+        res.status(400).send({ error: "No se pudo crear la vacante" });
+    }
+});
+
 // --- RUTA: OBTENER PERFIL ---
 app.get('/api/perfil/:email', async (req, res) => {
     try {
@@ -164,6 +175,29 @@ router.put('/api/perfil/update', async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Error al actualizar Atlas" });
     }
+});
+
+// Modelo de Vacante
+const VacanteSchema = new mongoose.Schema({
+    empresa: String,
+    puesto: String,
+    sueldo: String,
+    sector: String,
+    reclutadorEmail: String,
+    postulantes: [{ 
+        emailCandidato: String, 
+        nombreCandidato: String,
+        status: { type: String, default: 'Nuevo' }
+    }]
+});
+
+const Vacante = mongoose.model('Vacante', VacanteSchema);
+
+// Endpoint para crear vacante
+router.post('/api/vacantes', async (req, res) => {
+    const nuevaVacante = new Vacante(req.body);
+    await nuevaVacante.save();
+    res.status(201).json({ message: "Vacante publicada" });
 });
 
 const PORT = process.env.PORT || 3000;
