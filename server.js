@@ -71,6 +71,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Login
+// Login corregido
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -78,7 +79,8 @@ app.post('/api/login', async (req, res) => {
         if (user) {
             res.status(200).send({ 
                 message: "Login exitoso", 
-                rol: user.rol, 
+                rol: user.rol,        // Enviamos 'rol'
+                email: user.email,    // ¡IMPORTANTE! Enviamos el email
                 nombre: user.nombre,
                 verificado: user.verificado 
             });
