@@ -16,14 +16,13 @@ mongoose.connect(MONGO_URI)
 
 // --- MODELOS DE DATOS ---
 
-// Modelo de Usuario
 const UserSchema = new mongoose.Schema({
     nombre: String,
     apellidos: String,
     email: { type: String, unique: true, required: true },
     telefono: String,
     password: { type: String, required: true },
-    rol: String,
+    rol: String, // Se guarda como "Reclutador" o "Candidato"
     nombreEmpresa: String,
     ubicacion: String,
     verificado: { type: Boolean, default: false },
@@ -33,7 +32,6 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// Modelo de Vacante
 const VacanteSchema = new mongoose.Schema({
     empresa: String,
     puesto: String,
@@ -70,19 +68,24 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Login
-// Login corregido
+// LOGIN CORREGIDO PARA ANDROID
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email: email.trim(), password: password.trim() });
         if (user) {
+            // Enviamos los nombres de campos EXACTOS que espera tu RegisterResponse en Android
             res.status(200).send({ 
                 message: "Login exitoso", 
-                rol: user.rol,        // Enviamos 'rol'
-                email: user.email,    // ¡IMPORTANTE! Enviamos el email
-                nombre: user.nombre,
-                verificado: user.verificado 
+                rol: user.rol,           // Mapeado a 'role' en Android
+                nombres: user.nombre,    // Mapeado a 'nombres' (en plural)
+                apellidos: user.apellidos,
+                email: user.email,
+                telefono: user.telefono,
+                empresa: user.nombreEmpresa,
+                verificado: user.verificado,
+                fotoPerfil: user.fotoPerfil,
+                cvUrl: user.cvUrl        // Mapeado a 'curriculumUrl'
             });
         } else {
             res.status(401).send({ error: "Credenciales incorrectas" });
@@ -136,7 +139,7 @@ app.post('/api/verificar-codigo', async (req, res) => {
     }
 });
 
-// Crear Vacante (Corregido de router a app)
+// Crear Vacante
 app.post('/api/vacantes', async (req, res) => {
     try {
         const nuevaVacante = new Vacante(req.body);
@@ -147,7 +150,7 @@ app.post('/api/vacantes', async (req, res) => {
     }
 });
 
-// Obtener Perfil
+// Obtener Perfil (Actualizado para ser consistente)
 app.get('/api/perfil/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email.trim() });
@@ -159,7 +162,9 @@ app.get('/api/perfil/:email', async (req, res) => {
                 telefono: user.telefono,
                 empresa: user.nombreEmpresa,
                 rol: user.rol,
-                verificado: user.verificado
+                verificado: user.verificado,
+                fotoPerfil: user.fotoPerfil,
+                cvUrl: user.cvUrl
             });
         } else {
             res.status(404).send({ error: "Usuario no encontrado" });
@@ -169,7 +174,7 @@ app.get('/api/perfil/:email', async (req, res) => {
     }
 });
 
-// Actualizar Perfil (Corregido de router a app y de Usuario a User)
+// Actualizar Perfil
 app.put('/api/perfil/update', async (req, res) => {
     const { email, telefono, fotoPerfil, curriculumUrl } = req.body;
     try {
@@ -179,7 +184,7 @@ app.put('/api/perfil/update', async (req, res) => {
                 $set: { 
                     telefono: telefono,
                     fotoPerfil: fotoPerfil,
-                    cvUrl: curriculumUrl // Cambiado para coincidir con el Schema
+                    cvUrl: curriculumUrl 
                 } 
             },
             { new: true }
