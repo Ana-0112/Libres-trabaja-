@@ -5,7 +5,10 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 
 const app = express();
-app.use(express.json());
+
+// Configuración de límites para peticiones (por si acaso envías metadatos extensos)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cors());
 
 // --- CONEXIÓN A BASE DE DATOS ---
@@ -22,13 +25,13 @@ const UserSchema = new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     telefono: String,
     password: { type: String, required: true },
-    rol: String, // Se guarda como "Reclutador" o "Candidato"
+    rol: String, 
     nombreEmpresa: String,
     ubicacion: String,
     verificado: { type: Boolean, default: false },
     codigoVerificacion: String,
     fotoPerfil: { type: String, default: "" },
-    cvUrl: { type: String, default: "" }
+    cvUrl: { type: String, default: "" } // Aquí se guardará el link de Firebase
 });
 const User = mongoose.model('User', UserSchema);
 
@@ -68,24 +71,23 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// LOGIN CORREGIDO PARA ANDROID
+// Login
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email: email.trim(), password: password.trim() });
         if (user) {
-            // Enviamos los nombres de campos EXACTOS que espera tu RegisterResponse en Android
             res.status(200).send({ 
                 message: "Login exitoso", 
-                rol: user.rol,           // Mapeado a 'role' en Android
-                nombres: user.nombre,    // Mapeado a 'nombres' (en plural)
+                rol: user.rol,
+                nombres: user.nombre,
                 apellidos: user.apellidos,
                 email: user.email,
                 telefono: user.telefono,
                 empresa: user.nombreEmpresa,
                 verificado: user.verificado,
                 fotoPerfil: user.fotoPerfil,
-                cvUrl: user.cvUrl        // Mapeado a 'curriculumUrl'
+                cvUrl: user.cvUrl
             });
         } else {
             res.status(401).send({ error: "Credenciales incorrectas" });
@@ -95,38 +97,41 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Enviar Código
+// Enviar Código de Verificación
 app.post('/api/enviar-codigo-email', async (req, res) => {
     const { email } = req.body;
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
     try {
-        await User.findOneAndUpdate({ email: email.trim() }, { codigoVerificacion: codigo });
+        const emailTrim = email.trim();
+        await User.findOneAndUpdate({ email: emailTrim }, { codigoVerificacion: codigo });
+        
         const mailOptions = {
             from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
-            to: email,
+            to: emailTrim,
             subject: 'Código de Verificación - Libres Trabaja',
             html: `
                 <div style="font-family: sans-serif; text-align: center; border: 1px solid #008080; padding: 20px; border-radius: 10px;">
                     <h2 style="color: #008080;">Verificación de Cuenta</h2>
-                    <p>Hola, tu código para activar tu perfil es:</p>
-                    <h1 style="background: #f4f4f4; display: inline-block; padding: 10px; letter-spacing: 5px;">${codigo}</h1>
-                    <p>No compartas este código con nadie.</p>
+                    <p>Hola, tu código para activar tu perfil en <strong>Libres Trabaja</strong> es:</p>
+                    <h1 style="background: #f4f4f4; display: inline-block; padding: 10px; letter-spacing: 5px; color: #333;">${codigo}</h1>
+                    <p>Si no solicitaste este código, puedes ignorar este correo.</p>
                 </div>
             `
         };
         await transporter.sendMail(mailOptions);
         res.status(200).json({ message: 'Código enviado con éxito' });
     } catch (error) {
+        console.error("Error enviando mail:", error);
         res.status(500).json({ error: 'Error al enviar el correo' });
     }
 });
 
 // Verificar Código
 app.post('/api/verificar-codigo', async (req, res) => {
-    const { email, codigoIngresado } = req.body;
+    const { email, codigo } = req.body; 
     try {
         const user = await User.findOne({ email: email.trim() });
-        if (user && user.codigoVerificacion === codigoIngresado) {
+        if (user && user.codigoVerificacion === codigo) {
             user.verificado = true;
             user.codigoVerificacion = null; 
             await user.save();
@@ -139,18 +144,34 @@ app.post('/api/verificar-codigo', async (req, res) => {
     }
 });
 
-// Crear Vacante
-app.post('/api/vacantes', async (req, res) => {
+// Actualizar Perfil (Optimizado para URLs de Firebase)
+app.put('/api/perfil/update', async (req, res) => {
+    const { email, nombre, telefono, fotoPerfil, cvUrl } = req.body;
     try {
-        const nuevaVacante = new Vacante(req.body);
-        await nuevaVacante.save();
-        res.status(201).send({ message: "Vacante creada exitosamente" });
+        const updateData = {};
+        if (nombre) updateData.nombre = nombre;
+        if (telefono) updateData.telefono = telefono;
+        if (fotoPerfil !== undefined) updateData.fotoPerfil = fotoPerfil; 
+        if (cvUrl !== undefined) updateData.cvUrl = cvUrl;
+
+        const usuarioActualizado = await User.findOneAndUpdate(
+            { email: email.trim() },
+            { $set: updateData },
+            { new: true }
+        );
+
+        if (!usuarioActualizado) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        res.status(200).json({ message: "Actualizado con éxito", user: usuarioActualizado });
     } catch (error) {
-        res.status(400).send({ error: "No se pudo crear la vacante" });
+        console.error("Error en update:", error);
+        res.status(500).json({ message: "Error al actualizar en Atlas" });
     }
 });
 
-// Obtener Perfil (Actualizado para ser consistente)
+// Obtener Perfil Completo
 app.get('/api/perfil/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email.trim() });
@@ -174,24 +195,14 @@ app.get('/api/perfil/:email', async (req, res) => {
     }
 });
 
-// Actualizar Perfil
-app.put('/api/perfil/update', async (req, res) => {
-    const { email, telefono, fotoPerfil, curriculumUrl } = req.body;
+// Crear Vacante
+app.post('/api/vacantes', async (req, res) => {
     try {
-        const usuarioActualizado = await User.findOneAndUpdate(
-            { email: email },
-            { 
-                $set: { 
-                    telefono: telefono,
-                    fotoPerfil: fotoPerfil,
-                    cvUrl: curriculumUrl 
-                } 
-            },
-            { new: true }
-        );
-        res.status(200).json(usuarioActualizado);
+        const nuevaVacante = new Vacante(req.body);
+        await nuevaVacante.save();
+        res.status(201).send({ message: "Vacante creada exitosamente" });
     } catch (error) {
-        res.status(500).json({ message: "Error al actualizar Atlas" });
+        res.status(400).send({ error: "No se pudo crear la vacante" });
     }
 });
 
