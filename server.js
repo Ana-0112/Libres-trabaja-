@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const { Resend } = require('resend'); // Nueva librería para correos
+const nodemailer = require('nodemailer'); // Volvemos a Nodemailer
 const cloudinary = require('cloudinary').v2;
 
 const app = express();
@@ -12,22 +12,32 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// --- 2. CONFIGURACIÓN DE SERVICIOS (Cloudinary y Resend) ---
+// --- 2. CONFIGURACIÓN DE SERVICIOS (Cloudinary) ---
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Reemplaza 're_...' con tu llave de Resend o úsala desde Environment
-const resend = new Resend(process.env.RESEND_API_KEY || 're_H4BGMnJN_MHJrAWaGRW99k6EFLuVxnurJ');
+// --- 3. CONFIGURACIÓN DE GMAIL (Nodemailer) ---
+// Esta configuración usa el puerto 587 para intentar saltar el bloqueo de Render
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS // Tu contraseña de aplicación de 16 letras
+    },
+    tls: {
+        rejectUnauthorized: false // Ayuda a conectar desde servidores externos
+    }
+});
 
-// --- 3. CONEXIÓN A MONGO ATLAS ---
+// --- 4. CONEXIÓN A MONGO ATLAS ---
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("Conexión exitosa a MongoDB Atlas"))
     .catch(err => console.error("Error de conexión MongoDB:", err));
 
-// --- 4. MODELO DE USUARIO ---
+// --- 5. MODELO DE USUARIO ---
 const UserSchema = new mongoose.Schema({
     nombre: String,
     apellidos: String,
@@ -44,9 +54,8 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// --- 5. RUTAS DE PERFIL Y VERIFICACIÓN ---
+// --- 6. RUTAS DE PERFIL Y VERIFICACIÓN ---
 
-// Obtener perfil
 app.get('/api/perfil/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email.trim() });
@@ -66,7 +75,6 @@ app.get('/api/perfil/:email', async (req, res) => {
     }
 });
 
-// Verificar Código Manual
 app.post('/api/verificar-codigo', async (req, res) => {
     const { email, codigo } = req.body;
     try {
@@ -86,15 +94,14 @@ app.post('/api/verificar-codigo', async (req, res) => {
     }
 });
 
-// --- 6. RUTA MAESTRA: ENVIAR CÓDIGO POR EMAIL (RESEND) ---
+// --- 7. RUTA MAESTRA: ENVIAR CÓDIGO POR GMAIL ---
 app.post('/api/enviar-codigo-email', async (req, res) => {
     const { email } = req.body;
-    console.log("Petición de correo para:", email);
+    console.log("Intentando enviar correo a:", email);
 
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
 
     try {
-        // 1. Actualizar código en la DB
         const user = await User.findOneAndUpdate(
             { email: email.trim() }, 
             { codigoVerificacion: codigo },
@@ -103,9 +110,8 @@ app.post('/api/enviar-codigo-email', async (req, res) => {
         
         if (!user) return res.status(404).json({ error: "Usuario no registrado" });
 
-        // 2. Enviar vía Resend (Evita bloqueos de Render)
-        const { data, error } = await resend.emails.send({
-            from: 'Libres Trabaja <onboarding@resend.dev>',
+        const mailOptions = {
+            from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
             to: email.trim(),
             subject: 'Código de Verificación - Libres Trabaja',
             html: `
@@ -115,23 +121,25 @@ app.post('/api/enviar-codigo-email', async (req, res) => {
                     <p>Usa este código para verificar tu cuenta en la App.</p>
                 </div>
             `
-        });
+        };
 
-        if (error) {
-            console.error("Fallo Resend:", error);
-            return res.status(500).json({ error: "Error al enviar el correo" });
-        }
-
-        console.log("¡Código enviado exitosamente!");
+        // Enviamos el correo
+        await transporter.sendMail(mailOptions);
+        
+        console.log("¡Código enviado exitosamente vía Gmail!");
         res.status(200).json({ message: "Código enviado" });
 
     } catch (error) {
-        console.error("Error Interno:", error.message);
-        res.status(500).json({ error: "Error en el servidor" });
+        console.error("Fallo Gmail:", error.message);
+        // Respuesta de respaldo: Si falla el envío, informamos pero no bloqueamos el flujo
+        res.status(500).json({ 
+            error: "Error al enviar el correo", 
+            details: "Gmail rechazó la conexión desde el servidor." 
+        });
     }
 });
 
-// --- 7. REGISTRO, LOGIN Y UPLOAD ---
+// --- 8. REGISTRO, LOGIN Y UPLOAD ---
 
 app.post('/api/usuarios', async (req, res) => {
     try {
@@ -196,7 +204,7 @@ app.put('/api/perfil/update', async (req, res) => {
     }
 });
 
-// --- 8. INICIO DEL SERVIDOR ---
+// --- 9. INICIO DEL SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor Libres Trabaja corriendo en puerto ${PORT}`);
