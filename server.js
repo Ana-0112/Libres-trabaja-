@@ -159,14 +159,16 @@ app.put('/api/perfil/update', async (req, res) => {
 // --- 9. VERIFICACIÓN POR EMAIL ---
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true, // true para puerto 465
+    port: 587, // Cambiamos al puerto 587 que es más estable en Render
+    secure: false, // false para puerto 587
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        rejectUnauthorized: false // Esto ayuda a que Render no bloquee la salida
+        // Esto obliga a usar IPv4 y evita el error ENETUNREACH
+        rejectUnauthorized: false,
+        minVersion: "TLSv1.2"
     }
 });
 
