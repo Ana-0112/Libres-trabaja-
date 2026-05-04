@@ -158,28 +158,50 @@ app.put('/api/perfil/update', async (req, res) => {
 
 // --- 9. VERIFICACIÓN POR EMAIL ---
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true, // Usa SSL/TLS
+    auth: { 
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS // Recuerda: aquí van las 16 letras de Google
+    }
 });
 
 app.post('/api/enviar-codigo-email', async (req, res) => {
     const { email } = req.body;
+    console.log("Intentando enviar código a:", email); // Log para rastrear
+
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+
     try {
-        await User.findOneAndUpdate({ email: email.trim() }, { codigoVerificacion: codigo });
+        const user = await User.findOneAndUpdate(
+            { email: email.trim() },
+            { codigoVerificacion: codigo },
+            { new: true }
+        );
+
+        if (!user) {
+            console.log("Usuario no encontrado en Atlas");
+            return res.status(404).json({ error: "Usuario no registrado" });
+        }
+
         const mailOptions = {
-            from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
+            from: process.env.EMAIL_USER,
             to: email.trim(),
             subject: 'Código de Verificación - Libres Trabaja',
             text: `Tu código es: ${codigo}`
         };
+
+        // ENVIAR
         await transporter.sendMail(mailOptions);
-        res.status(200).json({ message: 'Código enviado' });
+        console.log("Correo enviado con éxito");
+        res.status(200).json({ message: "Código enviado" });
+
     } catch (error) {
-        res.status(500).json({ error: 'Error al enviar correo' });
+        console.error("ERROR AL ENVIAR CORREO:", error);
+        res.status(500).json({ error: "Error interno", details: error.message });
     }
 });
-
 // --- 10. PUERTO ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
