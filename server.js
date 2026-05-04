@@ -160,10 +160,13 @@ app.put('/api/perfil/update', async (req, res) => {
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
-    secure: true, // Usa SSL/TLS
-    auth: { 
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS // Recuerda: aquí van las 16 letras de Google
+    secure: true, // true para puerto 465
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    },
+    tls: {
+        rejectUnauthorized: false // Esto ayuda a que Render no bloquee la salida
     }
 });
 
@@ -175,11 +178,11 @@ app.post('/api/enviar-codigo-email', async (req, res) => {
 
     try {
         const user = await User.findOneAndUpdate(
-            { email: email.trim() },
-            { codigoVerificacion: codigo },
-            { new: true }
+        { email: email.trim() }, 
+        { codigoVerificacion: codigo },
+        { returnDocument: 'after' } // Esto quita el error del log
         );
-
+        
         if (!user) {
             console.log("Usuario no encontrado en Atlas");
             return res.status(404).json({ error: "Usuario no registrado" });
