@@ -98,25 +98,21 @@ app.post('/api/upload', async (req, res) => {
 });
 
 // --- 8. ACTUALIZAR PERFIL ---
+// En tu server.js (Node.js)
 app.put('/api/perfil/update', async (req, res) => {
-    const { email, nombre, telefono, fotoPerfil, cvUrl } = req.body;
+    const { email, nombre, nombres, telefono, fotoPerfil, cvUrl } = req.body;
     try {
         const updateData = {};
-        if (nombre) updateData.nombre = nombre;
+        // Aceptamos 'nombre' o 'nombres' para que no falle la sincronización
+        if (nombre || nombres) updateData.nombre = nombre || nombres; 
         if (telefono) updateData.telefono = telefono;
-        if (fotoPerfil !== undefined) updateData.fotoPerfil = fotoPerfil; 
-        if (cvUrl !== undefined) updateData.cvUrl = cvUrl;
+        if (fotoPerfil) updateData.fotoPerfil = fotoPerfil;
+        if (cvUrl) updateData.cvUrl = cvUrl;
 
-        const usuarioActualizado = await User.findOneAndUpdate(
-            { email: email.trim() },
-            { $set: updateData },
-            { new: true }
-        );
-
-        if (!usuarioActualizado) return res.status(404).json({ message: "Usuario no encontrado" });
-        res.status(200).json({ message: "Actualizado con éxito", user: usuarioActualizado });
+        await User.findOneAndUpdate({ email: email.trim() }, { $set: updateData });
+        res.status(200).json({ message: "Sincronizado con Atlas" });
     } catch (error) {
-        res.status(500).json({ message: "Error al actualizar" });
+        res.status(500).json({ error: "Error al sincronizar" });
     }
 });
 
