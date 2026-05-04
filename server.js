@@ -2,27 +2,30 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend'); // Nueva librería para correos
 const cloudinary = require('cloudinary').v2;
 
 const app = express();
 
-// --- 1. CONFIGURACIÓN DE LÍMITES (Para fotos y PDFs pesados) ---
+// --- 1. CONFIGURACIÓN DE LÍMITES ---
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// --- 2. CONFIGURACIÓN DE CLOUDINARY ---
+// --- 2. CONFIGURACIÓN DE SERVICIOS (Cloudinary y Resend) ---
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Reemplaza 're_...' con tu llave de Resend o úsala desde Environment
+const resend = new Resend(process.env.RESEND_API_KEY || 're_H4BGMnJN_MHJrAWaGRW99k6EFLuVxnurJ');
+
 // --- 3. CONEXIÓN A MONGO ATLAS ---
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("Conexión exitosa a MongoDB Atlas"))
-    .catch(err => console.error("Error de conexión:", err));
+    .catch(err => console.error("Error de conexión MongoDB:", err));
 
 // --- 4. MODELO DE USUARIO ---
 const UserSchema = new mongoose.Schema({
@@ -41,15 +44,15 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ... (Tus importaciones y config de Cloudinary y Mongo se quedan igual)
+// --- 5. RUTAS DE PERFIL Y VERIFICACIÓN ---
 
-// --- AGREGAR ESTA RUTA: OBTENER PERFIL (Indispensable para que no se borre al navegar) ---
+// Obtener perfil
 app.get('/api/perfil/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email.trim() });
         if (user) {
             res.status(200).json({
-                nombres: user.nombre, // Mapeamos 'nombre' de la DB a 'nombres' de la App
+                nombres: user.nombre,
                 telefono: user.telefono,
                 fotoPerfil: user.fotoPerfil,
                 cvUrl: user.cvUrl,
@@ -63,13 +66,17 @@ app.get('/api/perfil/:email', async (req, res) => {
     }
 });
 
-// --- AGREGAR ESTA RUTA: VERIFICAR CÓDIGO (Para que la validación funcione) ---
+// Verificar Código Manual
 app.post('/api/verificar-codigo', async (req, res) => {
     const { email, codigo } = req.body;
     try {
         const user = await User.findOne({ email: email.trim(), codigoVerificacion: codigo });
         if (user) {
-            await User.findOneAndUpdate({ email: email.trim() }, { verificado: true, codigoVerificacion: null });
+            await User.findOneAndUpdate(
+                { email: email.trim() }, 
+                { verificado: true, codigoVerificacion: null },
+                { returnDocument: 'after' }
+            );
             res.status(200).json({ message: "Correo verificado con éxito" });
         } else {
             res.status(400).json({ error: "Código incorrecto" });
@@ -79,50 +86,83 @@ app.post('/api/verificar-codigo', async (req, res) => {
     }
 });
 
-// ... (El resto de tus rutas de registro, login y upload se quedan igual)
+// --- 6. RUTA MAESTRA: ENVIAR CÓDIGO POR EMAIL (RESEND) ---
+app.post('/api/enviar-codigo-email', async (req, res) => {
+    const { email } = req.body;
+    console.log("Petición de correo para:", email);
 
-// --- 5. RUTA: REGISTRO DE USUARIOS ---
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+
+    try {
+        // 1. Actualizar código en la DB
+        const user = await User.findOneAndUpdate(
+            { email: email.trim() }, 
+            { codigoVerificacion: codigo },
+            { returnDocument: 'after' }
+        );
+        
+        if (!user) return res.status(404).json({ error: "Usuario no registrado" });
+
+        // 2. Enviar vía Resend (Evita bloqueos de Render)
+        const { data, error } = await resend.emails.send({
+            from: 'Libres Trabaja <onboarding@resend.dev>',
+            to: email.trim(),
+            subject: 'Código de Verificación - Libres Trabaja',
+            html: `
+                <div style="font-family: sans-serif; text-align: center;">
+                    <h2>Tu código de seguridad</h2>
+                    <h1 style="color: #4CAF50; font-size: 40px;">${codigo}</h1>
+                    <p>Usa este código para verificar tu cuenta en la App.</p>
+                </div>
+            `
+        });
+
+        if (error) {
+            console.error("Fallo Resend:", error);
+            return res.status(500).json({ error: "Error al enviar el correo" });
+        }
+
+        console.log("¡Código enviado exitosamente!");
+        res.status(200).json({ message: "Código enviado" });
+
+    } catch (error) {
+        console.error("Error Interno:", error.message);
+        res.status(500).json({ error: "Error en el servidor" });
+    }
+});
+
+// --- 7. REGISTRO, LOGIN Y UPLOAD ---
+
 app.post('/api/usuarios', async (req, res) => {
     try {
         const nuevoUsuario = new User(req.body);
         await nuevoUsuario.save();
         res.status(201).json({ message: "Usuario creado con éxito" });
     } catch (error) {
-        console.error("Error al registrar:", error);
-        res.status(400).json({ error: "El correo ya está registrado o faltan datos." });
+        res.status(400).json({ error: "El correo ya está registrado." });
     }
 });
 
-// --- 6. RUTA: LOGIN ---
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const user = await User.findOne({ 
-            email: email.trim(), 
-            password: password.trim() 
-        });
-
+        const user = await User.findOne({ email: email.trim(), password: password.trim() });
         if (user) {
             res.status(200).json({ 
                 message: "Login exitoso",
                 rol: user.rol,
                 nombres: user.nombre,
-                apellidos: user.apellidos,
                 email: user.email,
-                telefono: user.telefono,
-                verificado: user.verificado,
-                fotoPerfil: user.fotoPerfil,
-                cvUrl: user.cvUrl 
+                verificado: user.verificado
             });
         } else {
-            res.status(401).json({ error: "Correo o contraseña incorrectos" });
+            res.status(401).json({ error: "Credenciales incorrectas" });
         }
     } catch (error) {
         res.status(500).json({ error: "Error en el servidor" });
     }
 });
 
-// --- 7. RUTA: SUBIR A CLOUDINARY (Fotos y CVs) ---
 app.post('/api/upload', async (req, res) => {
     const { data, folder } = req.body; 
     try {
@@ -132,95 +172,32 @@ app.post('/api/upload', async (req, res) => {
         });
         res.status(200).json({ url: uploadResponse.secure_url });
     } catch (error) {
-        console.error("Error en Cloudinary:", error);
-        res.status(500).json({ error: "Error al subir archivo a la nube" });
+        res.status(500).json({ error: "Error al subir a la nube" });
     }
 });
 
-// --- 8. ACTUALIZAR PERFIL ---
-// En tu server.js (Node.js)
 app.put('/api/perfil/update', async (req, res) => {
-    const { email, nombre, nombres, telefono, fotoPerfil, cvUrl } = req.body;
+    const { email, nombres, telefono, fotoPerfil, cvUrl } = req.body;
     try {
         const updateData = {};
-        // Aceptamos 'nombre' o 'nombres' para que no falle la sincronización
-        if (nombre || nombres) updateData.nombre = nombre || nombres; 
+        if (nombres) updateData.nombre = nombres; 
         if (telefono) updateData.telefono = telefono;
         if (fotoPerfil) updateData.fotoPerfil = fotoPerfil;
         if (cvUrl) updateData.cvUrl = cvUrl;
 
-        await User.findOneAndUpdate({ email: email.trim() }, { $set: updateData });
-        res.status(200).json({ message: "Sincronizado con Atlas" });
-    } catch (error) {
-        res.status(500).json({ error: "Error al sincronizar" });
-    }
-});
-
-// --- 9. VERIFICACIÓN POR EMAIL ---
-// --- 9. VERIFICACIÓN POR EMAIL (Configuración Robusta) ---
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465, // Regresamos al 465 pero con un ajuste de seguridad
-    secure: true, 
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        // Esto es vital: evita que el servidor se trabe buscando rutas IPv6 inexistentes
-        rejectUnauthorized: false,
-        servername: 'smtp.gmail.com'
-    },
-    connectionTimeout: 5000, // Si en 5 segundos no conecta, aborta (para que no cargue eterno)
-    greetingTimeout: 5000
-});
-
-app.post('/api/enviar-codigo-email', async (req, res) => {
-    const { email } = req.body;
-    console.log("Petición recibida para:", email);
-
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-
-    try {
-        const user = await User.findOneAndUpdate(
+        await User.findOneAndUpdate(
             { email: email.trim() }, 
-            { codigoVerificacion: codigo },
+            { $set: updateData },
             { returnDocument: 'after' }
         );
-        
-        if (!user) return res.status(404).json({ error: "Usuario no registrado" });
-
-        // Enviar el correo con un manejo de error más rápido
-        const mailOptions = {
-            from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
-            to: email.trim(),
-            subject: 'Código de Verificación',
-            text: `Tu código es: ${codigo}`
-        };
-
-        // Ponemos un límite a la espera del envío
-        const sendEmailPromise = transporter.sendMail(mailOptions);
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout de red')), 8000)
-        );
-
-        // El primero que termine gana (el envío o el timeout de 8 segundos)
-        await Promise.race([sendEmailPromise, timeoutPromise]);
-
-        console.log("¡Correo enviado!");
-        return res.status(200).json({ message: "Código enviado" });
-
+        res.status(200).json({ message: "Perfil actualizado" });
     } catch (error) {
-        console.error("FALLO CRÍTICO:", error.message);
-        // Respondemos rápido para que la App deje de mostrar el círculo de carga
-        return res.status(500).json({ 
-            error: "Error de conexión con el servidor de correo",
-            details: error.message 
-        });
+        res.status(500).json({ error: "Error al actualizar" });
     }
 });
-// --- 10. PUERTO ---
+
+// --- 8. INICIO DEL SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
+    console.log(`Servidor Libres Trabaja corriendo en puerto ${PORT}`);
 });
