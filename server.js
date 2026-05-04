@@ -157,54 +157,66 @@ app.put('/api/perfil/update', async (req, res) => {
 });
 
 // --- 9. VERIFICACIÓN POR EMAIL ---
+// --- 9. VERIFICACIÓN POR EMAIL (Configuración Robusta) ---
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 587, // Cambiamos al puerto 587 que es más estable en Render
-    secure: false, // false para puerto 587
+    port: 465, // Regresamos al 465 pero con un ajuste de seguridad
+    secure: true, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        // Esto obliga a usar IPv4 y evita el error ENETUNREACH
+        // Esto es vital: evita que el servidor se trabe buscando rutas IPv6 inexistentes
         rejectUnauthorized: false,
-        minVersion: "TLSv1.2"
-    }
+        servername: 'smtp.gmail.com'
+    },
+    connectionTimeout: 5000, // Si en 5 segundos no conecta, aborta (para que no cargue eterno)
+    greetingTimeout: 5000
 });
 
 app.post('/api/enviar-codigo-email', async (req, res) => {
     const { email } = req.body;
-    console.log("Intentando enviar código a:", email); // Log para rastrear
+    console.log("Petición recibida para:", email);
 
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
 
     try {
         const user = await User.findOneAndUpdate(
-        { email: email.trim() }, 
-        { codigoVerificacion: codigo },
-        { returnDocument: 'after' } // Esto quita el error del log
+            { email: email.trim() }, 
+            { codigoVerificacion: codigo },
+            { returnDocument: 'after' }
         );
         
-        if (!user) {
-            console.log("Usuario no encontrado en Atlas");
-            return res.status(404).json({ error: "Usuario no registrado" });
-        }
+        if (!user) return res.status(404).json({ error: "Usuario no registrado" });
 
+        // Enviar el correo con un manejo de error más rápido
         const mailOptions = {
-            from: process.env.EMAIL_USER,
+            from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
             to: email.trim(),
-            subject: 'Código de Verificación - Libres Trabaja',
+            subject: 'Código de Verificación',
             text: `Tu código es: ${codigo}`
         };
 
-        // ENVIAR
-        await transporter.sendMail(mailOptions);
-        console.log("Correo enviado con éxito");
-        res.status(200).json({ message: "Código enviado" });
+        // Ponemos un límite a la espera del envío
+        const sendEmailPromise = transporter.sendMail(mailOptions);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout de red')), 8000)
+        );
+
+        // El primero que termine gana (el envío o el timeout de 8 segundos)
+        await Promise.race([sendEmailPromise, timeoutPromise]);
+
+        console.log("¡Correo enviado!");
+        return res.status(200).json({ message: "Código enviado" });
 
     } catch (error) {
-        console.error("ERROR AL ENVIAR CORREO:", error);
-        res.status(500).json({ error: "Error interno", details: error.message });
+        console.error("FALLO CRÍTICO:", error.message);
+        // Respondemos rápido para que la App deje de mostrar el círculo de carga
+        return res.status(500).json({ 
+            error: "Error de conexión con el servidor de correo",
+            details: error.message 
+        });
     }
 });
 // --- 10. PUERTO ---
