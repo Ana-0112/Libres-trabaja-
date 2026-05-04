@@ -41,6 +41,46 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
+// ... (Tus importaciones y config de Cloudinary y Mongo se quedan igual)
+
+// --- AGREGAR ESTA RUTA: OBTENER PERFIL (Indispensable para que no se borre al navegar) ---
+app.get('/api/perfil/:email', async (req, res) => {
+    try {
+        const user = await User.findOne({ email: req.params.email.trim() });
+        if (user) {
+            res.status(200).json({
+                nombres: user.nombre, // Mapeamos 'nombre' de la DB a 'nombres' de la App
+                telefono: user.telefono,
+                fotoPerfil: user.fotoPerfil,
+                cvUrl: user.cvUrl,
+                verificado: user.verificado
+            });
+        } else {
+            res.status(404).json({ error: "Usuario no encontrado" });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Error en servidor" });
+    }
+});
+
+// --- AGREGAR ESTA RUTA: VERIFICAR CÓDIGO (Para que la validación funcione) ---
+app.post('/api/verificar-codigo', async (req, res) => {
+    const { email, codigo } = req.body;
+    try {
+        const user = await User.findOne({ email: email.trim(), codigoVerificacion: codigo });
+        if (user) {
+            await User.findOneAndUpdate({ email: email.trim() }, { verificado: true, codigoVerificacion: null });
+            res.status(200).json({ message: "Correo verificado con éxito" });
+        } else {
+            res.status(400).json({ error: "Código incorrecto" });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Error al verificar" });
+    }
+});
+
+// ... (El resto de tus rutas de registro, login y upload se quedan igual)
+
 // --- 5. RUTA: REGISTRO DE USUARIOS ---
 app.post('/api/usuarios', async (req, res) => {
     try {
