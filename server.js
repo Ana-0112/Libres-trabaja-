@@ -3,30 +3,28 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const cloudinary = require('cloudinary').v2; // 1. Importar Cloudinary
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 
-// 2. Configuración de Cloudinary
+// --- 1. CONFIGURACIÓN DE LÍMITES (Para fotos y PDFs pesados) ---
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(cors());
+
+// --- 2. CONFIGURACIÓN DE CLOUDINARY ---
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Aumentamos el límite para recibir archivos Base64
-// Permite recibir archivos de hasta 50MB
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(cors());
-
-// --- CONEXIÓN A BASE DE DATOS ---
-const MONGO_URI = process.env.MONGO_URI; 
-mongoose.connect(MONGO_URI)
+// --- 3. CONEXIÓN A MONGO ATLAS ---
+mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("Conexión exitosa a MongoDB Atlas"))
     .catch(err => console.error("Error de conexión:", err));
 
-// --- MODELOS DE DATOS ---
+// --- 4. MODELO DE USUARIO ---
 const UserSchema = new mongoose.Schema({
     nombre: String,
     apellidos: String,
@@ -39,22 +37,59 @@ const UserSchema = new mongoose.Schema({
     verificado: { type: Boolean, default: false },
     codigoVerificacion: String,
     fotoPerfil: { type: String, default: "" },
-    cvUrl: { type: String, default: "" } // Aquí se guardará el link de Cloudinary
+    cvUrl: { type: String, default: "" }
 });
 const User = mongoose.model('User', UserSchema);
 
-// (El resto de tus esquemas como Vacante se mantienen igual...)
+// --- 5. RUTA: REGISTRO DE USUARIOS ---
+app.post('/api/usuarios', async (req, res) => {
+    try {
+        const nuevoUsuario = new User(req.body);
+        await nuevoUsuario.save();
+        res.status(201).json({ message: "Usuario creado con éxito" });
+    } catch (error) {
+        console.error("Error al registrar:", error);
+        res.status(400).json({ error: "El correo ya está registrado o faltan datos." });
+    }
+});
 
-// --- NUEVA RUTA PARA SUBIR ARCHIVOS ---
+// --- 6. RUTA: LOGIN ---
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const user = await User.findOne({ 
+            email: email.trim(), 
+            password: password.trim() 
+        });
+
+        if (user) {
+            res.status(200).json({ 
+                message: "Login exitoso",
+                rol: user.rol,
+                nombres: user.nombre,
+                apellidos: user.apellidos,
+                email: user.email,
+                telefono: user.telefono,
+                verificado: user.verificado,
+                fotoPerfil: user.fotoPerfil,
+                cvUrl: user.cvUrl 
+            });
+        } else {
+            res.status(401).json({ error: "Correo o contraseña incorrectos" });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Error en el servidor" });
+    }
+});
+
+// --- 7. RUTA: SUBIR A CLOUDINARY (Fotos y CVs) ---
 app.post('/api/upload', async (req, res) => {
-    const { data, folder } = req.body; // data es el Base64, folder es "fotos" o "cvs"
+    const { data, folder } = req.body; 
     try {
         const uploadResponse = await cloudinary.uploader.upload(data, {
             folder: `libres_trabaja/${folder}`,
-            resource_type: "auto" // Detecta si es imagen o PDF automáticamente
+            resource_type: "auto"
         });
-        
-        // Devolvemos la URL segura de Cloudinary
         res.status(200).json({ url: uploadResponse.secure_url });
     } catch (error) {
         console.error("Error en Cloudinary:", error);
@@ -62,10 +97,7 @@ app.post('/api/upload', async (req, res) => {
     }
 });
 
-// --- EL RESTO DE TUS RUTAS (Login, Register, etc.) ---
-// Se mantienen exactamente igual, solo asegúrate de que al llamar a 
-// /api/perfil/update mandes la URL que te dio Cloudinary.
-
+// --- 8. ACTUALIZAR PERFIL ---
 app.put('/api/perfil/update', async (req, res) => {
     const { email, nombre, telefono, fotoPerfil, cvUrl } = req.body;
     try {
@@ -81,19 +113,38 @@ app.put('/api/perfil/update', async (req, res) => {
             { new: true }
         );
 
-        if (!usuarioActualizado) {
-            return res.status(404).json({ message: "Usuario no encontrado" });
-        }
-
+        if (!usuarioActualizado) return res.status(404).json({ message: "Usuario no encontrado" });
         res.status(200).json({ message: "Actualizado con éxito", user: usuarioActualizado });
     } catch (error) {
-        console.error("Error en update:", error);
-        res.status(500).json({ message: "Error al actualizar en Atlas" });
+        res.status(500).json({ message: "Error al actualizar" });
     }
 });
 
-// (Mantén tus rutas de enviar-codigo, verificar-codigo, perfil/:email y vacantes igual)
+// --- 9. VERIFICACIÓN POR EMAIL ---
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+});
 
+app.post('/api/enviar-codigo-email', async (req, res) => {
+    const { email } = req.body;
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+        await User.findOneAndUpdate({ email: email.trim() }, { codigoVerificacion: codigo });
+        const mailOptions = {
+            from: `"Libres Trabaja" <${process.env.EMAIL_USER}>`,
+            to: email.trim(),
+            subject: 'Código de Verificación - Libres Trabaja',
+            text: `Tu código es: ${codigo}`
+        };
+        await transporter.sendMail(mailOptions);
+        res.status(200).json({ message: 'Código enviado' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al enviar correo' });
+    }
+});
+
+// --- 10. PUERTO ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
