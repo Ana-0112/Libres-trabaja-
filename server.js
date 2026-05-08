@@ -276,7 +276,22 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
         res.status(500).json({ error: "Error al obtener tus vacantes" });
     }
 });
-
+// Eliminar un postulante por su ID de postulación
+app.delete('/api/postulaciones/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const resultado = await Postulacion.findByIdAndDelete(id);
+        
+        if (!resultado) {
+            return res.status(404).json({ error: "La postulación no existe" });
+        }
+        
+        res.status(200).json({ message: "Postulante eliminado correctamente" });
+    } catch (error) {
+        console.error("Error al eliminar postulante:", error);
+        res.status(500).json({ error: "Error al eliminar la postulación" });
+    }
+});
 // ======================================================
 // SERVIDOR
 // ======================================================
