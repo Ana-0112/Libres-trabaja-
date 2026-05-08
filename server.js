@@ -276,20 +276,20 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
         res.status(500).json({ error: "Error al obtener tus vacantes" });
     }
 });
-// Eliminar un postulante por su ID de postulación
+
+// En tu server.js
 app.delete('/api/postulaciones/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        // MongoDB busca por _id automáticamente con findByIdAndDelete
         const resultado = await Postulacion.findByIdAndDelete(id);
         
         if (!resultado) {
-            return res.status(404).json({ error: "La postulación no existe" });
+            return res.status(404).json({ error: "No se encontró el registro" });
         }
-        
-        res.status(200).json({ message: "Postulante eliminado correctamente" });
+        res.status(200).json({ message: "Eliminado con éxito" });
     } catch (error) {
-        console.error("Error al eliminar postulante:", error);
-        res.status(500).json({ error: "Error al eliminar la postulación" });
+        res.status(500).json({ error: "Error en el servidor" });
     }
 });
 // ======================================================
