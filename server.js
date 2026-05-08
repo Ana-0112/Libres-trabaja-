@@ -202,6 +202,21 @@ app.put('/api/vacantes/:id', async (req, res) => {
     }
 });
 
+// Ejemplo en Node.js
+router.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
+    const { vacanteId, emisor, receptor } = req.params;
+    
+    const mensajes = await Message.find({
+        vacanteId: vacanteId,
+        $or: [
+            { emisor: emisor, receptor: receptor },
+            { emisor: receptor, receptor: emisor }
+        ]
+    }).sort({ time: 1 });
+    
+    res.json(mensajes);
+});
+
 // Postularse a una vacante
 app.post('/api/vacantes/postular', async (req, res) => {
     try {
