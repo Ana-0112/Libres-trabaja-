@@ -265,6 +265,18 @@ app.post('/api/upload', async (req, res) => {
     }
 });
 
+app.get('/api/vacantes/reclutador/:email', async (req, res) => {
+    try {
+        const emailBusqueda = req.params.email.trim().toLowerCase();
+        // Buscamos solo las vacantes creadas por este correo
+        const vacantes = await Vacante.find({ reclutadorEmail: emailBusqueda });
+        res.status(200).json(vacantes);
+    } catch (error) {
+        console.error("Error al obtener vacantes del reclutador:", error);
+        res.status(500).json({ error: "Error al obtener tus vacantes" });
+    }
+});
+
 // ======================================================
 // SERVIDOR
 // ======================================================
