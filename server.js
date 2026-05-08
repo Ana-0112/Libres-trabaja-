@@ -179,6 +179,28 @@ app.get('/api/vacantes', async (req, res) => {
         res.status(500).json({ error: "Error al obtener feed" });
     }
 });
+// Ejemplo de ruta en Node.js para editar
+app.put('/api/vacantes/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const datosActualizados = req.body;
+
+        const vacanteActualizada = await Vacante.findByIdAndUpdate(
+            id, 
+            datosActualizados, 
+            { new: true } // Para que devuelva el objeto ya cambiado
+        );
+
+        if (!vacanteActualizada) {
+            return res.status(404).json({ message: "Vacante no encontrada" });
+        }
+
+        res.status(200).json({ message: "Vacante actualizada con éxito" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al actualizar" });
+    }
+});
 
 // Postularse a una vacante
 app.post('/api/vacantes/postular', async (req, res) => {
