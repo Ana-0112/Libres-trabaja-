@@ -43,7 +43,7 @@ mongoose.connect(process.env.MONGO_URI)
     .catch((err) => console.log("Error MongoDB:", err));
 
 // ======================================================
-// MODELOS (Forzados para coincidir con tu Atlas)
+// MODELOS
 // ======================================================
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -82,8 +82,13 @@ const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
     mensajes: [{ emisor: String, texto: String, fecha: { type: Date, default: Date.now } }]
 }), 'postulacions');
 
+// MODELO MENSAJE ACTUALIZADO: Agregado vacanteId
 const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
-    emisor: String, receptor: String, texto: String, fecha: { type: Date, default: Date.now }
+    vacanteId: String, 
+    emisor: String, 
+    receptor: String, 
+    texto: String, 
+    fecha: { type: Date, default: Date.now }
 }), 'mensajes');
 
 // ======================================================
@@ -145,10 +150,9 @@ app.put('/api/perfil/update', async (req, res) => {
 });
 
 // ======================================================
-// RUTAS VACANTES (AQUÍ ESTABAN LOS CAMBIOS FALTANTES)
+// RUTAS VACANTES
 // ======================================================
 
-// Crear vacante
 app.post('/api/vacantes', async (req, res) => {
     try {
         const nuevaVacante = new Vacante(req.body);
@@ -159,18 +163,6 @@ app.post('/api/vacantes', async (req, res) => {
     }
 });
 
-// Obtener vacantes por email del reclutador (Para tu App)
-app.get('/api/vacantes/:email', async (req, res) => {
-    try {
-        const emailBusqueda = req.params.email.trim().toLowerCase();
-        const vacantes = await Vacante.find({ reclutadorEmail: emailBusqueda });
-        res.status(200).json(vacantes);
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener vacantes" });
-    }
-});
-
-// Obtener TODAS las vacantes (Feed candidatos)
 app.get('/api/vacantes', async (req, res) => {
     try {
         const vacantes = await Vacante.find().sort({ fechaCreacion: -1 });
@@ -179,45 +171,18 @@ app.get('/api/vacantes', async (req, res) => {
         res.status(500).json({ error: "Error al obtener feed" });
     }
 });
-// Ejemplo de ruta en Node.js para editar
+
 app.put('/api/vacantes/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const datosActualizados = req.body;
-
-        const vacanteActualizada = await Vacante.findByIdAndUpdate(
-            id, 
-            datosActualizados, 
-            { new: true } // Para que devuelva el objeto ya cambiado
-        );
-
-        if (!vacanteActualizada) {
-            return res.status(404).json({ message: "Vacante no encontrada" });
-        }
-
+        const vacanteActualizada = await Vacante.findByIdAndUpdate(id, req.body, { new: true });
+        if (!vacanteActualizada) return res.status(404).json({ message: "Vacante no encontrada" });
         res.status(200).json({ message: "Vacante actualizada con éxito" });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: "Error al actualizar" });
     }
 });
 
-// Ejemplo en Node.js
-router.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
-    const { vacanteId, emisor, receptor } = req.params;
-    
-    const mensajes = await Message.find({
-        vacanteId: vacanteId,
-        $or: [
-            { emisor: emisor, receptor: receptor },
-            { emisor: receptor, receptor: emisor }
-        ]
-    }).sort({ time: 1 });
-    
-    res.json(mensajes);
-});
-
-// Postularse a una vacante
 app.post('/api/vacantes/postular', async (req, res) => {
     try {
         const { vacanteId, candidatoEmail, nombreCandidato, puesto, reclutadorEmail } = req.body;
@@ -233,7 +198,6 @@ app.post('/api/vacantes/postular', async (req, res) => {
     }
 });
 
-// Obtener postulantes de una vacante
 app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
     try {
         const postulaciones = await Postulacion.find({ vacanteId: req.params.vacanteId }).sort({ _id: -1 });
@@ -257,31 +221,25 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
 });
 
 // ======================================================
-// RUTAS CHAT Y CLOUDINARY
+// RUTAS CHAT (CORREGIDAS PARA RENDER)
 // ======================================================
 
-app.post('/api/mensajes/enviar', async (req, res) => {
+// RUTA CORREGIDA: Se cambió 'router.get' por 'app.get' y se usa el modelo Mensaje
+app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
     try {
-        const { emisor, receptor, text } = req.body;
-        const nuevoMensaje = new Mensaje({ emisor: emisor.trim(), receptor: receptor.trim(), texto: text });
-        await nuevoMensaje.save();
-        res.status(201).json({ message: "Mensaje guardado" });
-    } catch (error) {
-        res.status(500).json({ error: "Error al enviar mensaje" });
-    }
-});
-
-app.get('/api/mensajes/:emisor/:receptor', async (req, res) => {
-    try {
-        const { emisor, receptor } = req.params;
+        const { vacanteId, emisor, receptor } = req.params;
         const mensajes = await Mensaje.find({
+            vacanteId: vacanteId,
             $or: [
                 { emisor: emisor.trim(), receptor: receptor.trim() },
                 { emisor: receptor.trim(), receptor: emisor.trim() }
             ]
         }).sort({ fecha: 1 });
+        
         const chatFormateado = mensajes.map(m => ({
-            text: m.texto, emisor: m.emisor, receptor: m.receptor,
+            text: m.texto, 
+            emisor: m.emisor, 
+            receptor: m.receptor,
             time: new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }));
         res.status(200).json(chatFormateado);
@@ -289,6 +247,26 @@ app.get('/api/mensajes/:emisor/:receptor', async (req, res) => {
         res.status(500).json({ error: "Error al obtener mensajes" });
     }
 });
+
+app.post('/api/mensajes/enviar', async (req, res) => {
+    try {
+        const { vacanteId, emisor, receptor, text } = req.body;
+        const nuevoMensaje = new Mensaje({ 
+            vacanteId: vacanteId,
+            emisor: emisor.trim(), 
+            receptor: receptor.trim(), 
+            texto: text 
+        });
+        await nuevoMensaje.save();
+        res.status(201).json({ message: "Mensaje guardado" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al enviar mensaje" });
+    }
+});
+
+// ======================================================
+// OTROS SERVICIOS (Cloudinary, Delete, etc.)
+// ======================================================
 
 app.post('/api/upload', async (req, res) => {
     try {
@@ -305,30 +283,23 @@ app.post('/api/upload', async (req, res) => {
 app.get('/api/vacantes/reclutador/:email', async (req, res) => {
     try {
         const emailBusqueda = req.params.email.trim().toLowerCase();
-        // Buscamos solo las vacantes creadas por este correo
         const vacantes = await Vacante.find({ reclutadorEmail: emailBusqueda });
         res.status(200).json(vacantes);
     } catch (error) {
-        console.error("Error al obtener vacantes del reclutador:", error);
         res.status(500).json({ error: "Error al obtener tus vacantes" });
     }
 });
 
-// En tu server.js
 app.delete('/api/postulaciones/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        // MongoDB busca por _id automáticamente con findByIdAndDelete
-        const resultado = await Postulacion.findByIdAndDelete(id);
-        
-        if (!resultado) {
-            return res.status(404).json({ error: "No se encontró el registro" });
-        }
+        const resultado = await Postulacion.findByIdAndDelete(req.params.id);
+        if (!resultado) return res.status(404).json({ error: "No se encontró el registro" });
         res.status(200).json({ message: "Eliminado con éxito" });
     } catch (error) {
         res.status(500).json({ error: "Error en el servidor" });
     }
 });
+
 // ======================================================
 // SERVIDOR
 // ======================================================
