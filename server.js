@@ -286,7 +286,21 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
     try {
         const emailBusqueda = req.params.email.trim().toLowerCase();
         const vacantes = await Vacante.find({ reclutadorEmail: emailBusqueda });
-        res.status(200).json(vacantes);
+        
+        // Mapeamos para asegurar que el ID se envíe como _id (para tu SerializedName)
+        const resultado = vacantes.map(v => ({
+            _id: v._id, // Aseguramos que use el guion bajo
+            empresa: v.empresa,
+            puesto: v.puesto,
+            sueldo: v.sueldo,
+            sector: v.sector,
+            ubicacion: v.ubicacion,
+            reclutadorEmail: v.reclutadorEmail,
+            descripcion: v.descripcion || "",
+            postulantes: v.postulantes
+        }));
+
+        res.status(200).json(resultado);
     } catch (error) {
         res.status(500).json({ error: "Error al obtener tus vacantes" });
     }
@@ -301,7 +315,15 @@ app.delete('/api/postulaciones/:id', async (req, res) => {
         res.status(500).json({ error: "Error en el servidor" });
     }
 });
-
+app.delete('/api/vacantes/:id', async (req, res) => {
+    try {
+        const resultado = await Vacante.findByIdAndDelete(req.params.id);
+        if (!resultado) return res.status(404).json({ error: "Vacante no encontrada" });
+        res.status(200).json({ message: "Vacante eliminada con éxito" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al eliminar la vacante" });
+    }
+});
 // ======================================================
 // SERVIDOR
 // ======================================================
