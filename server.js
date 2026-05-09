@@ -105,6 +105,37 @@ app.post('/api/usuarios', async (req, res) => {
         res.status(500).json({ error: "Error en registro" });
     }
 });
+// Ruta para eliminar una postulación específica por ID
+app.delete('/api/postulaciones/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Validar si el ID existe antes de intentar borrar
+        // 'Postulacion' debe ser el nombre de tu modelo de Mongoose
+        const postulacionEliminada = await Postulacion.findByIdAndDelete(id);
+
+        if (!postulacionEliminada) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "No se encontró la postulación" 
+            });
+        }
+
+        // Respuesta exitosa
+        res.status(200).json({ 
+            success: true, 
+            message: "Postulante eliminado correctamente" 
+        });
+
+    } catch (error) {
+        console.error("Error al eliminar:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Error interno del servidor",
+            error: error.message 
+        });
+    }
+});
 
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
