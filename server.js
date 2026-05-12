@@ -181,7 +181,8 @@ app.put('/api/perfil/update', async (req, res) => {
 
 app.post('/api/vacantes/postular', async (req, res) => {
     try {
-        const { vacanteId, candidatoEmail, nombreCandidato, puesto, reclutadorEmail } = req.body;
+        // 1. Agregamos 'empresa' aquí para recibirla desde el celular
+        const { vacanteId, candidatoEmail, nombreCandidato, puesto, reclutadorEmail, empresa } = req.body;
         const emailLimpio = candidatoEmail.trim().toLowerCase();
 
         if (!mongoose.Types.ObjectId.isValid(vacanteId)) {
@@ -196,15 +197,15 @@ app.post('/api/vacantes/postular', async (req, res) => {
             candidatoEmail: emailLimpio, 
             reclutadorEmail: reclutadorEmail.trim().toLowerCase(), 
             nombreCandidato, 
-            puesto 
+            puesto,
+            empresa // 2. IMPORTANTE: Agregamos esta línea para que se guarde en MongoDB
         });
 
         await nuevaPost.save();
 
-       
         await Vacante.findByIdAndUpdate(
           vacanteId, 
-          { $addToSet: { postulantes: emailLimpio } } // $addToSet evita duplicados
+          { $addToSet: { postulantes: emailLimpio } }
         );
 
         res.status(201).json({ message: "Postulación exitosa" });
