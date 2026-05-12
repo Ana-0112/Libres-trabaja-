@@ -25,11 +25,11 @@ const User = mongoose.model('User', new mongoose.Schema({
     nombre: String, email: { type: String, unique: true }, rol: String, fotoPerfil: String, cvUrl: String, empresa: String, password: { type: String, required: true }
 }), 'users');
 
-const Vacante = mongoose.model('Vacante', new mongoose.Schema({
+const Vacante = mongoose.model('vacante', new mongoose.Schema({
     empresa: String, puesto: String, sueldo: String, reclutadorEmail: String, postulantes: Array, fechaCreacion: { type: Date, default: Date.now }
 }), 'vacantes');
 
-const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
+const Postulacion = mongoose.model('postulacion', new mongoose.Schema({
     vacanteId: String, candidatoEmail: String, reclutadorEmail: String, nombreCandidato: String, puesto: String, empresa: String, estado: { type: String, default: 'Pendiente' }
 }), 'postulaciones');
 
