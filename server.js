@@ -94,6 +94,14 @@ const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
     fecha: { type: Date, default: Date.now }
 }), 'mensajes');
 
+const mensajes = await Mensaje.find({
+    vacanteId: vacanteId,
+    $or: [
+        { emisor: emisor, receptor: receptor }, // Mensajes de ida
+        { emisor: receptor, receptor: emisor }  // Mensajes de vuelta
+    ]
+}).sort({ fecha: 1 });
+
 // ======================================================
 // RUTAS USUARIOS Y PERFIL
 // ======================================================
@@ -268,26 +276,38 @@ app.post('/api/vacantes', async (req, res) => {
 // ======================================================
 // RUTAS CHAT
 // ======================================================
-
-app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
+// CORRECCIÓN EN EL SERVER: Añade (.+) a los parámetros de email
+app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', async (req, res) => {
     try {
         const { vacanteId, emisor, receptor } = req.params;
+        
+        // Es vital limpiar los datos para que coincidan con la DB
+        const emisorClean = emisor.trim().toLowerCase();
+        const receptorClean = receptor.trim().toLowerCase();
+
         const mensajes = await Mensaje.find({
             vacanteId: vacanteId,
             $or: [
-                { emisor: emisor.trim().toLowerCase(), receptor: receptor.trim().toLowerCase() },
-                { emisor: receptor.trim().toLowerCase(), receptor: emisor.trim().toLowerCase() }
+                { emisor: emisorClean, receptor: receptorClean },
+                { emisor: receptorClean, receptor: emisorClean }
             ]
         }).sort({ fecha: 1 });
         
+        // Si no hay mensajes, enviamos [] con un 200 (evita el crash en Android)
+        if (!mensajes || mensajes.length === 0) {
+            return res.status(200).json([]);
+        }
+
         const chatFormateado = mensajes.map(m => ({
             text: m.texto, 
             emisor: m.emisor, 
             receptor: m.receptor,
-            time: new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            time: m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
         }));
+
         res.status(200).json(chatFormateado);
     } catch (error) {
+        console.error("Error en mensajes:", error);
         res.status(500).json({ error: "Error al obtener mensajes" });
     }
 });
