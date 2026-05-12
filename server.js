@@ -8,11 +8,14 @@ const cloudinary = require('cloudinary').v2;
 const app = express();
 
 // ======================================================
-// CONFIG
+// CONFIGURACIÓN
 // ======================================================
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({
+    limit: '50mb',
+    extended: true
+}));
 app.use(cors());
 
 // ======================================================
@@ -31,10 +34,10 @@ cloudinary.config({
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
-    console.log("✅ MongoDB conectado");
+    console.log("✅ MongoDB conectado correctamente");
 })
 .catch((err) => {
-    console.log("❌ Error Mongo:", err);
+    console.log("❌ Error MongoDB:", err);
 });
 
 // ======================================================
@@ -43,14 +46,21 @@ mongoose.connect(process.env.MONGO_URI)
 
 const User = mongoose.model('User', new mongoose.Schema({
 
-    nombre: String,
+    nombre: {
+        type: String,
+        default: ""
+    },
 
     email: {
         type: String,
-        unique: true
+        unique: true,
+        required: true
     },
 
-    rol: String,
+    rol: {
+        type: String,
+        default: "candidato"
+    },
 
     fotoPerfil: {
         type: String,
@@ -62,7 +72,15 @@ const User = mongoose.model('User', new mongoose.Schema({
         default: ""
     },
 
-    empresa: String,
+    empresa: {
+        type: String,
+        default: ""
+    },
+
+    telefono: {
+        type: String,
+        default: ""
+    },
 
     password: {
         type: String,
@@ -73,13 +91,35 @@ const User = mongoose.model('User', new mongoose.Schema({
 
 const Vacante = mongoose.model('Vacante', new mongoose.Schema({
 
-    empresa: String,
+    empresa: {
+        type: String,
+        default: ""
+    },
 
-    puesto: String,
+    puesto: {
+        type: String,
+        default: ""
+    },
 
-    sueldo: String,
+    sueldo: {
+        type: String,
+        default: ""
+    },
 
-    reclutadorEmail: String,
+    sector: {
+        type: String,
+        default: ""
+    },
+
+    ubicacion: {
+        type: String,
+        default: ""
+    },
+
+    reclutadorEmail: {
+        type: String,
+        default: ""
+    },
 
     postulantes: {
         type: Array,
@@ -95,34 +135,74 @@ const Vacante = mongoose.model('Vacante', new mongoose.Schema({
 
 const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
 
-    vacanteId: String,
+    vacanteId: {
+        type: String,
+        default: ""
+    },
 
-    candidatoEmail: String,
+    candidatoEmail: {
+        type: String,
+        default: ""
+    },
 
-    reclutadorEmail: String,
+    reclutadorEmail: {
+        type: String,
+        default: ""
+    },
 
-    nombreCandidato: String,
+    nombreCandidato: {
+        type: String,
+        default: ""
+    },
 
-    puesto: String,
+    puesto: {
+        type: String,
+        default: ""
+    },
 
-    empresa: String,
+    empresa: {
+        type: String,
+        default: ""
+    },
 
     estado: {
         type: String,
         default: "Pendiente"
+    },
+
+    mensaje: {
+        type: String,
+        default: ""
+    },
+
+    entrevistaFecha: {
+        type: String,
+        default: ""
     }
 
 }), 'postulaciones');
 
 const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
 
-    vacanteId: String,
+    vacanteId: {
+        type: String,
+        default: ""
+    },
 
-    emisor: String,
+    emisor: {
+        type: String,
+        default: ""
+    },
 
-    receptor: String,
+    receptor: {
+        type: String,
+        default: ""
+    },
 
-    texto: String,
+    texto: {
+        type: String,
+        default: ""
+    },
 
     fecha: {
         type: Date,
@@ -147,16 +227,18 @@ app.post('/api/login', async (req, res) => {
         });
 
         if (!user) {
+
             return res.status(401).json({
                 error: "Usuario no encontrado"
             });
+
         }
 
         res.status(200).json(user);
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR LOGIN:", e);
 
         res.status(500).json({
             error: "Error login"
@@ -178,12 +260,63 @@ app.get('/api/perfil/:email', async (req, res) => {
             email: req.params.email.trim().toLowerCase()
         });
 
+        if (!user) {
+
+            return res.status(404).json({
+                error: "Perfil no encontrado"
+            });
+
+        }
+
         res.status(200).json(user);
 
     } catch (e) {
 
+        console.log("ERROR PERFIL:", e);
+
         res.status(500).json({
             error: "Error perfil"
+        });
+
+    }
+
+});
+
+// ======================================================
+// ACTUALIZAR PERFIL
+// ======================================================
+
+app.put('/api/perfil/update', async (req, res) => {
+
+    try {
+
+        const actualizado =
+            await User.findOneAndUpdate(
+
+                {
+                    email: req.body.email
+                        .trim()
+                        .toLowerCase()
+                },
+
+                {
+                    $set: req.body
+                },
+
+                {
+                    new: true
+                }
+
+            );
+
+        res.status(200).json(actualizado);
+
+    } catch (e) {
+
+        console.log("ERROR UPDATE PERFIL:", e);
+
+        res.status(500).json({
+            error: "Error actualizando perfil"
         });
 
     }
@@ -198,7 +331,16 @@ app.post('/api/vacantes', async (req, res) => {
 
     try {
 
-        const nueva = new Vacante(req.body);
+        const nueva = new Vacante({
+
+            ...req.body,
+
+            reclutadorEmail:
+                req.body.reclutadorEmail
+                .trim()
+                .toLowerCase()
+
+        });
 
         await nueva.save();
 
@@ -208,7 +350,7 @@ app.post('/api/vacantes', async (req, res) => {
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR CREAR VACANTE:", e);
 
         res.status(500).json({
             error: "Error creando vacante"
@@ -219,7 +361,7 @@ app.post('/api/vacantes', async (req, res) => {
 });
 
 // ======================================================
-// OBTENER VACANTES
+// OBTENER TODAS LAS VACANTES
 // ======================================================
 
 app.get('/api/vacantes', async (req, res) => {
@@ -227,14 +369,106 @@ app.get('/api/vacantes', async (req, res) => {
     try {
 
         const vacantes = await Vacante.find()
-        .sort({ fechaCreacion: -1 });
+        .sort({
+            fechaCreacion: -1
+        });
 
         res.status(200).json(vacantes);
 
     } catch (e) {
 
+        console.log("ERROR VACANTES:", e);
+
         res.status(500).json({
             error: "Error vacantes"
+        });
+
+    }
+
+});
+
+// ======================================================
+// VACANTES DEL RECLUTADOR
+// ======================================================
+
+app.get('/api/vacantes/reclutador/:email', async (req, res) => {
+
+    try {
+
+        const email =
+            req.params.email
+            .trim()
+            .toLowerCase();
+
+        const vacantes = await Vacante.find({
+            reclutadorEmail: email
+        }).sort({
+            fechaCreacion: -1
+        });
+
+        res.status(200).json(vacantes);
+
+    } catch (e) {
+
+        console.log("ERROR VACANTES RECLUTADOR:", e);
+
+        res.status(500).json({
+            error: "Error vacantes reclutador"
+        });
+
+    }
+
+});
+
+// ======================================================
+// ELIMINAR VACANTE
+// ======================================================
+
+app.delete('/api/vacantes/:id', async (req, res) => {
+
+    try {
+
+        await Vacante.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            message: "Vacante eliminada"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR ELIMINAR VACANTE:", e);
+
+        res.status(500).json({
+            error: "Error eliminando vacante"
+        });
+
+    }
+
+});
+
+// ======================================================
+// ACTUALIZAR VACANTE
+// ======================================================
+
+app.put('/api/vacantes/:id', async (req, res) => {
+
+    try {
+
+        await Vacante.findByIdAndUpdate(
+            req.params.id,
+            req.body
+        );
+
+        res.status(200).json({
+            message: "Vacante actualizada"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR UPDATE VACANTE:", e);
+
+        res.status(500).json({
+            error: "Error actualizando vacante"
         });
 
     }
@@ -254,27 +488,43 @@ app.post('/api/vacantes/postular', async (req, res) => {
             candidatoEmail
         } = req.body;
 
+        const email =
+            candidatoEmail
+            .trim()
+            .toLowerCase();
+
         const existe = await Postulacion.findOne({
             vacanteId,
-            candidatoEmail
+            candidatoEmail: email
         });
 
         if (existe) {
 
             return res.status(400).json({
-                error: "Ya postulado"
+                error: "Ya te postulaste"
             });
 
         }
 
-        const vacante = await Vacante.findById(vacanteId);
+        const vacante =
+            await Vacante.findById(vacanteId);
+
+        const usuario =
+            await User.findOne({
+                email
+            });
 
         const nueva = new Postulacion({
 
             ...req.body,
 
+            candidatoEmail: email,
+
             reclutadorEmail:
-                vacante.reclutadorEmail
+                vacante?.reclutadorEmail || "",
+
+            nombreCandidato:
+                usuario?.nombre || ""
 
         });
 
@@ -284,7 +534,7 @@ app.post('/api/vacantes/postular', async (req, res) => {
             vacanteId,
             {
                 $addToSet: {
-                    postulantes: candidatoEmail
+                    postulantes: email
                 }
             }
         );
@@ -295,10 +545,42 @@ app.post('/api/vacantes/postular', async (req, res) => {
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR POSTULACIÓN:", e);
 
         res.status(500).json({
             error: "Error postulación"
+        });
+
+    }
+
+});
+
+// ======================================================
+// POSTULACIONES DEL CANDIDATO
+// ======================================================
+
+app.get('/api/postulaciones/usuario/:email', async (req, res) => {
+
+    try {
+
+        const email =
+            req.params.email
+            .trim()
+            .toLowerCase();
+
+        const postulaciones =
+            await Postulacion.find({
+                candidatoEmail: email
+            });
+
+        res.status(200).json(postulaciones);
+
+    } catch (e) {
+
+        console.log("ERROR POSTULACIONES:", e);
+
+        res.status(500).json({
+            error: "Error postulaciones"
         });
 
     }
@@ -322,9 +604,10 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
 
             postulaciones.map(async (post) => {
 
-                const usuario = await User.findOne({
-                    email: post.candidatoEmail
-                });
+                const usuario =
+                    await User.findOne({
+                        email: post.candidatoEmail
+                    });
 
                 return {
 
@@ -342,6 +625,12 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
                     estado:
                         post.estado || "",
 
+                    mensaje:
+                        post.mensaje || "",
+
+                    entrevista:
+                        post.entrevistaFecha || "",
+
                     fotoPerfil:
                         usuario?.fotoPerfil || "",
 
@@ -358,7 +647,7 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR POSTULANTES:", e);
 
         res.status(500).json({
             error: "Error postulantes"
@@ -369,7 +658,35 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
 });
 
 // ======================================================
-// CHAT GET
+// ELIMINAR POSTULANTE
+// ======================================================
+
+app.delete('/api/postulaciones/:id', async (req, res) => {
+
+    try {
+
+        await Postulacion.findByIdAndDelete(
+            req.params.id
+        );
+
+        res.status(200).json({
+            message: "Postulante eliminado"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR ELIMINAR POSTULANTE:", e);
+
+        res.status(500).json({
+            error: "Error eliminando postulante"
+        });
+
+    }
+
+});
+
+// ======================================================
+// CHAT OBTENER MENSAJES
 // ======================================================
 
 app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
@@ -382,6 +699,12 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
             receptor
         } = req.params;
 
+        const e =
+            emisor.trim().toLowerCase();
+
+        const r =
+            receptor.trim().toLowerCase();
+
         const mensajes = await Mensaje.find({
 
             vacanteId,
@@ -389,18 +712,20 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
             $or: [
 
                 {
-                    emisor,
-                    receptor
+                    emisor: e,
+                    receptor: r
                 },
 
                 {
-                    emisor: receptor,
-                    receptor: emisor
+                    emisor: r,
+                    receptor: e
                 }
 
             ]
 
-        }).sort({ fecha: 1 });
+        }).sort({
+            fecha: 1
+        });
 
         res.status(200).json(
 
@@ -412,7 +737,8 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
 
                 receptor: m.receptor,
 
-                time: m.fecha
+                time:
+                    m.fecha
                     ? new Date(m.fecha)
                         .toLocaleTimeString([], {
                             hour: '2-digit',
@@ -426,7 +752,7 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR CHAT GET:", e);
 
         res.status(500).json({
             error: "Error chat"
@@ -437,7 +763,7 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
 });
 
 // ======================================================
-// CHAT ENVIAR
+// CHAT ENVIAR MENSAJE
 // ======================================================
 
 app.post('/api/mensajes/enviar', async (req, res) => {
@@ -455,9 +781,11 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 
             vacanteId,
 
-            emisor,
+            emisor:
+                emisor.trim().toLowerCase(),
 
-            receptor,
+            receptor:
+                receptor.trim().toLowerCase(),
 
             texto
 
@@ -471,7 +799,7 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR ENVIAR MENSAJE:", e);
 
         res.status(500).json({
             error: "Error enviar mensaje"
@@ -482,7 +810,7 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 });
 
 // ======================================================
-// UPLOAD
+// UPLOAD CLOUDINARY
 // ======================================================
 
 app.post('/api/upload', async (req, res) => {
@@ -504,7 +832,7 @@ app.post('/api/upload', async (req, res) => {
 
     } catch (e) {
 
-        console.log(e);
+        console.log("ERROR UPLOAD:", e);
 
         res.status(500).json({
             error: "Error upload"
@@ -522,6 +850,6 @@ const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, '0.0.0.0', () => {
 
-    console.log(` Servidor activo puerto ${PORT}`);
+    console.log(`🚀 Servidor activo puerto ${PORT}`);
 
 });
