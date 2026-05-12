@@ -12,10 +12,12 @@ const app = express();
 // ======================================================
 
 app.use(express.json({ limit: '50mb' }));
+
 app.use(express.urlencoded({
     limit: '50mb',
     extended: true
 }));
+
 app.use(cors());
 
 // ======================================================
@@ -23,9 +25,13 @@ app.use(cors());
 // ======================================================
 
 cloudinary.config({
+
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+
     api_key: process.env.CLOUDINARY_API_KEY,
+
     api_secret: process.env.CLOUDINARY_API_SECRET
+
 });
 
 // ======================================================
@@ -33,11 +39,17 @@ cloudinary.config({
 // ======================================================
 
 mongoose.connect(process.env.MONGO_URI)
+
 .then(() => {
+
     console.log("✅ MongoDB conectado correctamente");
+
 })
+
 .catch((err) => {
+
     console.log("❌ Error MongoDB:", err);
+
 });
 
 // ======================================================
@@ -222,8 +234,11 @@ app.post('/api/login', async (req, res) => {
         const { email, password } = req.body;
 
         const user = await User.findOne({
+
             email: email.trim().toLowerCase(),
+
             password: password.trim()
+
         });
 
         if (!user) {
@@ -257,7 +272,9 @@ app.get('/api/perfil/:email', async (req, res) => {
     try {
 
         const user = await User.findOne({
+
             email: req.params.email.trim().toLowerCase()
+
         });
 
         if (!user) {
@@ -425,46 +442,36 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
 // ======================================================
 
 app.delete('/api/vacantes/:id', async (req, res) => {
+
     try {
-        const result = await Vacante.findByIdAndDelete(req.params.id);
-        
+
+        const result =
+            await Vacante.findByIdAndDelete(req.params.id);
+
         if (!result) {
-            return res.status(404).json({ message: "Vacante no encontrada" });
+
+            return res.status(404).json({
+                message: "Vacante no encontrada"
+            });
+
         }
 
         res.status(200).json({
             message: "Vacante eliminada"
         });
+
     } catch (e) {
-        console.error(e);
-        res.status(500).json({ message: "Error interno del servidor" });
-    }
-});
-// ==========================================================
-// ELIMINAR POSTULACIÓN (CANDIDATO)
-// ==========================================
 
-app.delete('/api/postulaciones/:id', async (req, res) => {
-    try {
-        // Buscamos la postulación por el ID enviado desde la app
-        const postulacionEliminada = await Postulacion.findByIdAndDelete(req.params.id);
+        console.error("ERROR ELIMINAR VACANTE:", e);
 
-        if (!postulacionEliminada) {
-            return res.status(404).json({ 
-                message: "La postulación no existe o ya fue eliminada" 
-            });
-        }
-
-        res.status(200).json({
-            message: "Postulación retirada con éxito"
+        res.status(500).json({
+            message: "Error interno del servidor"
         });
-    } catch (e) {
-        console.error("Error al eliminar postulación:", e);
-        res.status(500).json({ 
-            message: "Hubo un error en el servidor al intentar eliminar" 
-        });
+
     }
+
 });
+
 // ======================================================
 // ACTUALIZAR VACANTE
 // ======================================================
@@ -513,8 +520,11 @@ app.post('/api/vacantes/postular', async (req, res) => {
             .toLowerCase();
 
         const existe = await Postulacion.findOne({
+
             vacanteId,
+
             candidatoEmail: email
+
         });
 
         if (existe) {
@@ -550,12 +560,15 @@ app.post('/api/vacantes/postular', async (req, res) => {
         await nueva.save();
 
         await Vacante.findByIdAndUpdate(
+
             vacanteId,
+
             {
                 $addToSet: {
                     postulantes: email
                 }
             }
+
         );
 
         res.status(201).json({
@@ -677,27 +690,48 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
 });
 
 // ======================================================
-// ELIMINAR POSTULANTE
+// ELIMINAR POSTULACIÓN
 // ======================================================
 
 app.delete('/api/postulaciones/:id', async (req, res) => {
 
     try {
 
-        await Postulacion.findByIdAndDelete(
-            req.params.id
+        const postulacionEliminada =
+            await Postulacion.findByIdAndDelete(req.params.id);
+
+        if (!postulacionEliminada) {
+
+            return res.status(404).json({
+                message: "La postulación no existe"
+            });
+
+        }
+
+        // Eliminar también del arreglo postulantes
+        await Vacante.findByIdAndUpdate(
+
+            postulacionEliminada.vacanteId,
+
+            {
+                $pull: {
+                    postulantes:
+                        postulacionEliminada.candidatoEmail
+                }
+            }
+
         );
 
         res.status(200).json({
-            message: "Postulante eliminado"
+            message: "Postulación eliminada correctamente"
         });
 
     } catch (e) {
 
-        console.log("ERROR ELIMINAR POSTULANTE:", e);
+        console.error("ERROR ELIMINAR POSTULACIÓN:", e);
 
         res.status(500).json({
-            error: "Error eliminando postulante"
+            message: "Error interno del servidor"
         });
 
     }
@@ -838,11 +872,14 @@ app.post('/api/upload', async (req, res) => {
 
         const result =
             await cloudinary.uploader.upload(
+
                 req.body.data,
+
                 {
                     folder: "libres_trabaja",
                     resource_type: "auto"
                 }
+
             );
 
         res.status(200).json({
@@ -869,6 +906,6 @@ const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, '0.0.0.0', () => {
 
-    console.log(`Servidor activo puerto ${PORT}`);
+    console.log(` Servidor activo puerto ${PORT}`);
 
 });
