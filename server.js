@@ -360,6 +360,21 @@ app.patch('/api/postulaciones/:id/estado', async (req, res) => {
     }
 });
 
+// AGREGA ESTO EN TU SERVIDOR NODE.JS
+app.get('/api/postulaciones/usuario/:email', async (req, res) => {
+    try {
+        const emailBusqueda = req.params.email.trim().toLowerCase();
+        // Buscamos todas las postulaciones donde el candidatoEmail coincida
+        const postulaciones = await Postulacion.find({ candidatoEmail: emailBusqueda });
+        
+        // Enviamos la lista al celular
+        res.status(200).json(postulaciones);
+    } catch (error) {
+        console.error("Error al obtener postulaciones:", error);
+        res.status(500).json({ error: "Error en el servidor" });
+    }
+});
+
 // ======================================================
 // SERVIDOR
 // ======================================================
