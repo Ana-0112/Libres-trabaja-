@@ -425,25 +425,20 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
 // ======================================================
 
 app.delete('/api/vacantes/:id', async (req, res) => {
-
     try {
-
-        await Vacante.findByIdAndDelete(req.params.id);
+        const result = await Vacante.findByIdAndDelete(req.params.id);
+        
+        if (!result) {
+            return res.status(404).json({ message: "Vacante no encontrada" });
+        }
 
         res.status(200).json({
             message: "Vacante eliminada"
         });
-
     } catch (e) {
-
-        console.log("ERROR ELIMINAR VACANTE:", e);
-
-        res.status(500).json({
-            error: "Error eliminando vacante"
-        });
-
+        console.error(e);
+        res.status(500).json({ message: "Error interno del servidor" });
     }
-
 });
 
 // ======================================================
