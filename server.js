@@ -23,11 +23,11 @@ cloudinary.config({
 
 // MONGODB
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("Conectado a MongoDB Atlas"))
+    .then(() => console.log("Conectado a MongoDB Atlas (Base de datos: ltrabaja)"))
     .catch((err) => console.log("Error MongoDB:", err));
 
 // ======================================================
-// MODELOS (Definidos una sola vez)
+// MODELOS
 // ======================================================
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -75,7 +75,7 @@ const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
 }), 'mensajes');
 
 // ======================================================
-// RUTAS
+// RUTAS DE PERFIL Y LOGIN
 // ======================================================
 
 app.post('/api/login', async (req, res) => {
@@ -90,59 +90,124 @@ app.post('/api/login', async (req, res) => {
     } catch (error) { res.status(500).json({ error: "Error en login" }); }
 });
 
-// RUTA DE CHAT CORREGIDA (Sin el await suelto)
-// Cambia esto:
-// app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', ...
+app.get('/api/perfil/:email', async (req, res) => {
+    try {
+        const user = await User.findOne({ email: req.params.email.trim().toLowerCase() });
+        if (!user) return res.status(404).json({ error: "No encontrado" });
+        res.status(200).json(user);
+    } catch (error) { res.status(500).json({ error: "Error servidor" }); }
+});
 
-// Por esto:
+app.put('/api/perfil/update', async (req, res) => {
+    try {
+        const actualizado = await User.findOneAndUpdate(
+            { email: req.body.email.trim().toLowerCase() }, 
+            { $set: req.body },
+            { new: true }
+        );
+        res.status(200).json(actualizado);
+    } catch (error) { res.status(500).json({ error: "Error al actualizar" }); }
+});
+
+// ======================================================
+// RUTAS DE VACANTES
+// ======================================================
+
+app.get('/api/vacantes', async (req, res) => {
+    try {
+        const vacantes = await Vacante.find().sort({ fechaCreacion: -1 });
+        res.status(200).json(vacantes);
+    } catch (error) { res.status(500).json({ error: "Error al obtener vacantes" }); }
+});
+
+app.post('/api/vacantes', async (req, res) => {
+    try {
+        const nueva = new Vacante({ ...req.body, reclutadorEmail: req.body.reclutadorEmail.trim().toLowerCase() });
+        await nueva.save();
+        res.status(201).json({ message: "Vacante creada" });
+    } catch (error) { res.status(500).json({ error: "Error" }); }
+});
+
+app.get('/api/vacantes/reclutador/:email', async (req, res) => {
+    try {
+        const vacantes = await Vacante.find({ reclutadorEmail: req.params.email.trim().toLowerCase() });
+        res.status(200).json(vacantes);
+    } catch (error) { res.status(500).json({ error: "Error" }); }
+});
+
+// ======================================================
+// RUTAS DE POSTULACIONES
+// ======================================================
+
+app.post('/api/vacantes/postular', async (req, res) => {
+    try {
+        const { vacanteId, candidatoEmail } = req.body;
+        const emailLimpio = candidatoEmail.trim().toLowerCase();
+        
+        const existe = await Postulacion.findOne({ vacanteId, candidatoEmail: emailLimpio });
+        if (existe) return res.status(400).json({ error: "Ya te postulaste" });
+
+        const nuevaPost = new Postulacion({ ...req.body, candidatoEmail: emailLimpio });
+        await nuevaPost.save();
+
+        await Vacante.findByIdAndUpdate(vacanteId, { $addToSet: { postulantes: emailLimpio } });
+        res.status(201).json({ message: "Postulación exitosa" });
+    } catch (error) { res.status(500).json({ error: "Error al postular" }); }
+});
+
+app.get('/api/postulaciones/usuario/:email', async (req, res) => {
+    try {
+        const post = await Postulacion.find({ candidatoEmail: req.params.email.trim().toLowerCase() });
+        res.status(200).json(post);
+    } catch (error) { res.status(500).json({ error: "Error" }); }
+});
+
+// ======================================================
+// RUTAS DE CHAT
+// ======================================================
+
 app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
     try {
         const { vacanteId, emisor, receptor } = req.params;
-        
-        // La limpieza se hace aquí adentro, no en la URL
-        const emisorClean = decodeURIComponent(emisor).trim().toLowerCase();
-        const receptorClean = decodeURIComponent(receptor).trim().toLowerCase();
+        const eClean = emisor.trim().toLowerCase();
+        const rClean = receptor.trim().toLowerCase();
 
-        const mensajesDb = await Mensaje.find({
-            vacanteId: vacanteId,
-            $or: [
-                { emisor: emisorClean, receptor: receptorClean },
-                { emisor: receptorClean, receptor: emisorClean }
-            ]
+        const mensajes = await Mensaje.find({
+            vacanteId,
+            $or: [{ emisor: eClean, receptor: rClean }, { emisor: rClean, receptor: eClean }]
         }).sort({ fecha: 1 });
         
-        const chatFormateado = mensajesDb.map(m => ({
-            text: m.texto, 
-            emisor: m.emisor, 
-            receptor: m.receptor,
+        res.status(200).json(mensajes.map(m => ({
+            text: m.texto, emisor: m.emisor, receptor: m.receptor,
             time: m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
-        }));
-
-        res.status(200).json(chatFormateado);
-    } catch (error) {
-        console.error("Error en chat:", error);
-        res.status(500).json({ error: "Error al obtener mensajes" });
-    }
+        })));
+    } catch (error) { res.status(500).json({ error: "Error chat" }); }
 });
 
 app.post('/api/mensajes/enviar', async (req, res) => {
     try {
-        const { vacanteId, emisor, receptor, text } = req.body;
-        const nuevoMensaje = new Mensaje({ 
-            vacanteId,
-            emisor: emisor.trim().toLowerCase(), 
-            receptor: receptor.trim().toLowerCase(), 
-            texto: text 
-        });
-        await nuevoMensaje.save();
-        res.status(201).json({ message: "Mensaje guardado" });
-    } catch (error) { res.status(500).json({ error: "Error al enviar" }); }
+        const nuevo = new Mensaje({ ...req.body, emisor: req.body.emisor.trim().toLowerCase(), receptor: req.body.receptor.trim().toLowerCase() });
+        await nuevo.save();
+        res.status(201).json({ message: "Enviado" });
+    } catch (error) { res.status(500).json({ error: "Error" }); }
 });
 
-// ... (Cualquier otra ruta necesaria como /api/vacantes puede ir aquí abajo)
+// ======================================================
+// OTROS SERVICIOS (Cloudinary)
+// ======================================================
+
+app.post('/api/upload', async (req, res) => {
+    try {
+        const result = await cloudinary.uploader.upload(req.body.data, {
+            folder: `libres_trabaja/${req.body.folder}`,
+            resource_type: "auto"
+        });
+        res.status(200).json({ url: result.secure_url });
+    } catch (error) { res.status(500).json({ error: "Error subida" }); }
+});
 
 // SERVIDOR
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`Servidor de Libres Trabaja corriendo en puerto ${PORT}`);
 });
