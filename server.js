@@ -79,11 +79,12 @@ const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
     reclutadorEmail: String,
     nombreCandidato: String,
     puesto: String,
+    empresa: String, // <--- AGREGA ESTA LÍNEA AQUÍ
     estado: { type: String, default: 'Pendiente' },
     entrevistaFecha: { type: String, default: "Pendiente" },
     ultimoMensaje: { type: String, default: 'Sin mensajes aún' },
     mensajes: [{ emisor: String, texto: String, fecha: { type: Date, default: Date.now } }]
-}), 'postulacions');
+}));
 
 const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
     vacanteId: String, 
