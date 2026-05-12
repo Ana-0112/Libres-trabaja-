@@ -129,12 +129,15 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// server.js
 app.get('/api/perfil/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email.trim() });
         if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+        
         res.status(200).json({ 
-            nombre: user.nombre, 
+            nombres: user.nombre, // Asegúrate de que coincida con tu modelo (user.nombre o user.nombres)
+            telefono: user.telefono, // <--- ESTO ES LO QUE FALTABA
             fotoPerfil: user.fotoPerfil, 
             cvUrl: user.cvUrl, 
             verificado: user.verificado,
@@ -286,6 +289,8 @@ app.post('/api/mensajes/enviar', async (req, res) => {
         res.status(500).json({ error: "Error al enviar mensaje" });
     }
 });
+
+
 
 // ======================================================
 // OTROS SERVICIOS
