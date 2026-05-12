@@ -125,14 +125,14 @@ app.post('/api/vacantes', async (req, res) => {
         const nueva = new Vacante({ ...req.body, reclutadorEmail: req.body.reclutadorEmail.trim().toLowerCase() });
         await nueva.save();
         res.status(201).json({ message: "Vacante creada" });
-    } catch (error) { res.status(500).json({ error: "Error" }); }
+    } catch (error) { res.status(500).json({ error: "Error al crear vacante" }); }
 });
 
 app.get('/api/vacantes/reclutador/:email', async (req, res) => {
     try {
         const vacantes = await Vacante.find({ reclutadorEmail: req.params.email.trim().toLowerCase() });
         res.status(200).json(vacantes);
-    } catch (error) { res.status(500).json({ error: "Error" }); }
+    } catch (error) { res.status(500).json({ error: "Error al buscar vacantes" }); }
 });
 
 // ======================================================
@@ -159,11 +159,11 @@ app.get('/api/postulaciones/usuario/:email', async (req, res) => {
     try {
         const post = await Postulacion.find({ candidatoEmail: req.params.email.trim().toLowerCase() });
         res.status(200).json(post);
-    } catch (error) { res.status(500).json({ error: "Error" }); }
+    } catch (error) { res.status(500).json({ error: "Error al obtener postulaciones" }); }
 });
 
 // ======================================================
-// RUTAS DE CHAT
+// RUTAS DE CHAT (CORREGIDAS)
 // ======================================================
 
 app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
@@ -174,22 +174,45 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
 
         const mensajes = await Mensaje.find({
             vacanteId,
-            $or: [{ emisor: eClean, receptor: rClean }, { emisor: rClean, receptor: eClean }]
+            $or: [
+                { emisor: eClean, receptor: rClean }, 
+                { emisor: rClean, receptor: eClean }
+            ]
         }).sort({ fecha: 1 });
         
         res.status(200).json(mensajes.map(m => ({
-            text: m.texto, emisor: m.emisor, receptor: m.receptor,
+            text: m.texto, 
+            emisor: m.emisor, 
+            receptor: m.receptor,
             time: m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
         })));
-    } catch (error) { res.status(500).json({ error: "Error chat" }); }
+    } catch (error) { 
+        console.error("Error chat GET:", error);
+        res.status(500).json({ error: "Error al cargar mensajes" }); 
+    }
 });
 
 app.post('/api/mensajes/enviar', async (req, res) => {
     try {
-        const nuevo = new Mensaje({ ...req.body, emisor: req.body.emisor.trim().toLowerCase(), receptor: req.body.receptor.trim().toLowerCase() });
-        await nuevo.save();
-        res.status(201).json({ message: "Enviado" });
-    } catch (error) { res.status(500).json({ error: "Error" }); }
+        const { vacanteId, emisor, receptor, texto } = req.body;
+        
+        if (!texto || !emisor || !receptor) {
+            return res.status(400).json({ error: "Faltan datos obligatorios" });
+        }
+
+        const nuevoMensaje = new Mensaje({ 
+            vacanteId,
+            emisor: emisor.trim().toLowerCase(), 
+            receptor: receptor.trim().toLowerCase(), 
+            texto: texto 
+        });
+
+        await nuevoMensaje.save();
+        res.status(201).json({ message: "Mensaje guardado correctamente" });
+    } catch (error) { 
+        console.error("Error chat POST:", error);
+        res.status(500).json({ error: "Error al guardar el mensaje" }); 
+    }
 });
 
 // ======================================================
