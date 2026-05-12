@@ -7,7 +7,9 @@ const cloudinary = require('cloudinary').v2;
 
 const app = express();
 
+// ======================================================
 // CONFIGURACIÓN
+// ======================================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
@@ -19,22 +21,15 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// GMAIL
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: { rejectUnauthorized: false }
-});
-
 // MONGODB
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("Conectado a MongoDB Atlas"))
     .catch((err) => console.log("Error MongoDB:", err));
 
-// MODELOS
+// ======================================================
+// MODELOS (Definidos una sola vez)
+// ======================================================
+
 const User = mongoose.model('User', new mongoose.Schema({
     nombre: String,
     email: { type: String, unique: true, required: true },
@@ -66,10 +61,10 @@ const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
     reclutadorEmail: String,
     nombreCandidato: String,
     puesto: String,
-    empresa: String, 
+    empresa: String,
     estado: { type: String, default: 'Pendiente' },
     entrevistaFecha: { type: String, default: "Pendiente" }
-}));
+}), 'postulaciones');
 
 const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
     vacanteId: String, 
@@ -79,19 +74,9 @@ const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
     fecha: { type: Date, default: Date.now }
 }), 'mensajes');
 
-// === AQUÍ ELIMINÉ EL BLOQUE QUE CAUSABA EL ERROR ===
-
-// RUTAS USUARIOS
-app.post('/api/usuarios', async (req, res) => {
-    try {
-        const emailLimpio = req.body.email.trim().toLowerCase();
-        const existe = await User.findOne({ email: emailLimpio });
-        if (existe) return res.status(400).json({ error: "El usuario ya existe" });
-        const nuevoUsuario = new User({ ...req.body, email: emailLimpio });
-        await nuevoUsuario.save();
-        res.status(201).json({ message: "Usuario creado" });
-    } catch (error) { res.status(500).json({ error: "Error en registro" }); }
-});
+// ======================================================
+// RUTAS
+// ======================================================
 
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -99,19 +84,20 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ email: email.trim().toLowerCase(), password: password.trim() });
         if (user) {
             res.status(200).json({ rol: user.rol, nombres: user.nombre, email: user.email, verificado: user.verificado });
-        } else { res.status(401).json({ error: "Credenciales incorrectas" }); }
+        } else {
+            res.status(401).json({ error: "Credenciales incorrectas" });
+        }
     } catch (error) { res.status(500).json({ error: "Error en login" }); }
 });
 
-// RUTAS CHAT (CON LÓGICA DE BÚSQUEDA CORREGIDA)
+// RUTA DE CHAT CORREGIDA (Sin el await suelto)
 app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', async (req, res) => {
     try {
         const { vacanteId, emisor, receptor } = req.params;
         const emisorClean = emisor.trim().toLowerCase();
         const receptorClean = receptor.trim().toLowerCase();
 
-        // Esta es la búsqueda que debe ir dentro de la ruta:
-        const mensajesDb = await Mensaje.find({
+        const mensajes = await Mensaje.find({
             vacanteId: vacanteId,
             $or: [
                 { emisor: emisorClean, receptor: receptorClean },
@@ -119,7 +105,7 @@ app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', async (req, res) =
             ]
         }).sort({ fecha: 1 });
         
-        const chatFormateado = mensajesDb.map(m => ({
+        const chatFormateado = mensajes.map(m => ({
             text: m.texto, 
             emisor: m.emisor, 
             receptor: m.receptor,
@@ -136,15 +122,17 @@ app.post('/api/mensajes/enviar', async (req, res) => {
     try {
         const { vacanteId, emisor, receptor, text } = req.body;
         const nuevoMensaje = new Mensaje({ 
-            vacanteId: vacanteId,
+            vacanteId,
             emisor: emisor.trim().toLowerCase(), 
             receptor: receptor.trim().toLowerCase(), 
             texto: text 
         });
         await nuevoMensaje.save();
         res.status(201).json({ message: "Mensaje guardado" });
-    } catch (error) { res.status(500).json({ error: "Error al enviar mensaje" }); }
+    } catch (error) { res.status(500).json({ error: "Error al enviar" }); }
 });
+
+// ... (Cualquier otra ruta necesaria como /api/vacantes puede ir aquí abajo)
 
 // SERVIDOR
 const PORT = process.env.PORT || 10000;
