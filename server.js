@@ -91,13 +91,19 @@ app.post('/api/login', async (req, res) => {
 });
 
 // RUTA DE CHAT CORREGIDA (Sin el await suelto)
-app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', async (req, res) => {
+// Cambia esto:
+// app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', ...
+
+// Por esto:
+app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
     try {
         const { vacanteId, emisor, receptor } = req.params;
-        const emisorClean = emisor.trim().toLowerCase();
-        const receptorClean = receptor.trim().toLowerCase();
+        
+        // La limpieza se hace aquí adentro, no en la URL
+        const emisorClean = decodeURIComponent(emisor).trim().toLowerCase();
+        const receptorClean = decodeURIComponent(receptor).trim().toLowerCase();
 
-        const mensajes = await Mensaje.find({
+        const mensajesDb = await Mensaje.find({
             vacanteId: vacanteId,
             $or: [
                 { emisor: emisorClean, receptor: receptorClean },
@@ -105,7 +111,7 @@ app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', async (req, res) =
             ]
         }).sort({ fecha: 1 });
         
-        const chatFormateado = mensajes.map(m => ({
+        const chatFormateado = mensajesDb.map(m => ({
             text: m.texto, 
             emisor: m.emisor, 
             receptor: m.receptor,
@@ -114,6 +120,7 @@ app.get('/api/mensajes/:vacanteId/:emisor(.+)/:receptor(.+)', async (req, res) =
 
         res.status(200).json(chatFormateado);
     } catch (error) {
+        console.error("Error en chat:", error);
         res.status(500).json({ error: "Error al obtener mensajes" });
     }
 });
