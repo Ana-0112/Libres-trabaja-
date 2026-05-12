@@ -214,6 +214,24 @@ app.post('/api/mensajes/enviar', async (req, res) => {
         res.status(500).json({ error: "Error al guardar el mensaje" }); 
     }
 });
+// RUTA PARA QUE EL RECLUTADOR VEA SUS POSTULANTES
+app.get('/api/postulaciones/reclutador/:email', async (req, res) => {
+    try {
+        const emailReclutador = req.params.email.trim().toLowerCase();
+        
+        // Buscamos todas las postulaciones dirigidas a este reclutador
+        const postulaciones = await Postulacion.find({ reclutadorEmail: emailReclutador });
+        
+        if (postulaciones.length === 0) {
+            return res.status(200).json([]); // Devolvemos lista vacía si no hay nadie
+        }
+
+        res.status(200).json(postulaciones);
+    } catch (error) {
+        console.error("Error al cargar postulantes:", error);
+        res.status(500).json({ error: "Error al obtener la lista de postulantes" });
+    }
+});
 
 // ======================================================
 // OTROS SERVICIOS (Cloudinary)
@@ -228,6 +246,7 @@ app.post('/api/upload', async (req, res) => {
         res.status(200).json({ url: result.secure_url });
     } catch (error) { res.status(500).json({ error: "Error subida" }); }
 });
+
 
 // SERVIDOR
 const PORT = process.env.PORT || 10000;
