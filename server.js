@@ -56,7 +56,11 @@ const User = mongoose.model('User', new mongoose.Schema({
     verificado: { type: Boolean, default: false },
     codigoVerificacion: String,
     fotoPerfil: { type: String, default: "" },
-    cvUrl: { type: String, default: "" }
+    cvUrl: { type: String, default: "" },
+    // NUEVOS CAMPOS RECLUTADOR
+    empresa: { type: String, default: "" },
+    ubicacion: { type: String, default: "" },
+    fotosEmpresa: { type: [String], default: ["", "", ""] }
 }), 'users');
 
 const Vacante = mongoose.model('Vacante', new mongoose.Schema({
@@ -82,7 +86,6 @@ const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
     mensajes: [{ emisor: String, texto: String, fecha: { type: Date, default: Date.now } }]
 }), 'postulacions');
 
-// MODELO MENSAJE ACTUALIZADO: Agregado vacanteId
 const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
     vacanteId: String, 
     emisor: String, 
@@ -94,6 +97,7 @@ const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
 // ======================================================
 // RUTAS USUARIOS Y PERFIL
 // ======================================================
+
 app.post('/api/usuarios', async (req, res) => {
     try {
         const existe = await User.findOne({ email: req.body.email.trim() });
@@ -105,15 +109,18 @@ app.post('/api/usuarios', async (req, res) => {
         res.status(500).json({ error: "Error en registro" });
     }
 });
-// Ruta para eliminar una postulación específica por ID
-
 
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email: email.trim(), password: password.trim() });
         if (user) {
-            res.status(200).json({ rol: user.rol, nombres: user.nombre, email: user.email, verificado: user.verificado });
+            res.status(200).json({ 
+                rol: user.rol, 
+                nombres: user.nombre, 
+                email: user.email, 
+                verificado: user.verificado 
+            });
         } else {
             res.status(401).json({ error: "Credenciales incorrectas" });
         }
@@ -130,7 +137,10 @@ app.get('/api/perfil/:email', async (req, res) => {
             nombre: user.nombre, 
             fotoPerfil: user.fotoPerfil, 
             cvUrl: user.cvUrl, 
-            verificado: user.verificado 
+            verificado: user.verificado,
+            empresa: user.empresa,
+            ubicacion: user.ubicacion,
+            fotosEmpresa: user.fotosEmpresa
         });
     } catch (error) {
         res.status(500).json({ error: "Error servidor" });
@@ -138,12 +148,16 @@ app.get('/api/perfil/:email', async (req, res) => {
 });
 
 app.put('/api/perfil/update', async (req, res) => {
-    const { email, nombre, nombres, fotoPerfil, cvUrl } = req.body;
+    const { email, nombre, nombres, fotoPerfil, cvUrl, empresa, ubicacion, fotosEmpresa } = req.body;
     try {
         const updateData = {};
         if (nombre || nombres) updateData.nombre = nombre || nombres;
         if (fotoPerfil) updateData.fotoPerfil = fotoPerfil;
         if (cvUrl) updateData.cvUrl = cvUrl;
+        if (empresa) updateData.empresa = empresa;
+        if (ubicacion) updateData.ubicacion = ubicacion;
+        if (fotosEmpresa) updateData.fotosEmpresa = fotosEmpresa;
+
         await User.findOneAndUpdate({ email: email.trim() }, { $set: updateData });
         res.status(200).json({ message: "Perfil actualizado" });
     } catch (error) {
@@ -223,10 +237,9 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
 });
 
 // ======================================================
-// RUTAS CHAT (CORREGIDAS PARA RENDER)
+// RUTAS CHAT
 // ======================================================
 
-// RUTA CORREGIDA: Se cambió 'router.get' por 'app.get' y se usa el modelo Mensaje
 app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
     try {
         const { vacanteId, emisor, receptor } = req.params;
@@ -267,7 +280,7 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 });
 
 // ======================================================
-// OTROS SERVICIOS (Cloudinary, Delete, etc.)
+// OTROS SERVICIOS
 // ======================================================
 
 app.post('/api/upload', async (req, res) => {
@@ -287,9 +300,8 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
         const emailBusqueda = req.params.email.trim().toLowerCase();
         const vacantes = await Vacante.find({ reclutadorEmail: emailBusqueda });
         
-        // Mapeamos para asegurar que el ID se envíe como _id (para tu SerializedName)
         const resultado = vacantes.map(v => ({
-            _id: v._id, // Aseguramos que use el guion bajo
+            _id: v._id,
             empresa: v.empresa,
             puesto: v.puesto,
             sueldo: v.sueldo,
@@ -315,6 +327,7 @@ app.delete('/api/postulaciones/:id', async (req, res) => {
         res.status(500).json({ error: "Error en el servidor" });
     }
 });
+
 app.delete('/api/vacantes/:id', async (req, res) => {
     try {
         const resultado = await Vacante.findByIdAndDelete(req.params.id);
@@ -324,6 +337,7 @@ app.delete('/api/vacantes/:id', async (req, res) => {
         res.status(500).json({ error: "Error al eliminar la vacante" });
     }
 });
+
 // ======================================================
 // SERVIDOR
 // ======================================================
