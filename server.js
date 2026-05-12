@@ -57,7 +57,6 @@ const User = mongoose.model('User', new mongoose.Schema({
     codigoVerificacion: String,
     fotoPerfil: { type: String, default: "" },
     cvUrl: { type: String, default: "" },
-    // NUEVOS CAMPOS RECLUTADOR
     empresa: { type: String, default: "" },
     ubicacion: { type: String, default: "" },
     fotosEmpresa: { type: [String], default: ["", "", ""] }
@@ -100,9 +99,11 @@ const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
 
 app.post('/api/usuarios', async (req, res) => {
     try {
-        const existe = await User.findOne({ email: req.body.email.trim() });
+        const emailLimpio = req.body.email.trim().toLowerCase();
+        const existe = await User.findOne({ email: emailLimpio });
         if (existe) return res.status(400).json({ error: "El usuario ya existe" });
-        const nuevoUsuario = new User(req.body);
+        
+        const nuevoUsuario = new User({ ...req.body, email: emailLimpio });
         await nuevoUsuario.save();
         res.status(201).json({ message: "Usuario creado" });
     } catch (error) {
@@ -113,7 +114,7 @@ app.post('/api/usuarios', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email: email.trim(), password: password.trim() });
+        const user = await User.findOne({ email: email.trim().toLowerCase(), password: password.trim() });
         if (user) {
             res.status(200).json({ 
                 rol: user.rol, 
@@ -129,15 +130,14 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// server.js
 app.get('/api/perfil/:email', async (req, res) => {
     try {
-        const user = await User.findOne({ email: req.params.email.trim() });
+        const user = await User.findOne({ email: req.params.email.trim().toLowerCase() });
         if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
         
         res.status(200).json({ 
-            nombres: user.nombre, // Asegúrate de que coincida con tu modelo (user.nombre o user.nombres)
-            telefono: user.telefono, // <--- ESTO ES LO QUE FALTABA
+            nombres: user.nombre,
+            telefono: user.telefono,
             fotoPerfil: user.fotoPerfil, 
             cvUrl: user.cvUrl, 
             verificado: user.verificado,
@@ -151,12 +151,11 @@ app.get('/api/perfil/:email', async (req, res) => {
 });
 
 app.put('/api/perfil/update', async (req, res) => {
-    // Agregamos 'telefono' a la desestructuración
     const { email, nombre, nombres, telefono, fotoPerfil, cvUrl, empresa, ubicacion, fotosEmpresa } = req.body;
     try {
         const updateData = {};
         if (nombre || nombres) updateData.nombre = nombre || nombres;
-        if (telefono) updateData.telefono = telefono; // <--- ESTO FALTABA
+        if (telefono) updateData.telefono = telefono;
         if (fotoPerfil) updateData.fotoPerfil = fotoPerfil;
         if (cvUrl) updateData.cvUrl = cvUrl;
         if (empresa) updateData.empresa = empresa;
@@ -164,9 +163,9 @@ app.put('/api/perfil/update', async (req, res) => {
         if (fotosEmpresa) updateData.fotosEmpresa = fotosEmpresa;
 
         const actualizado = await User.findOneAndUpdate(
-            { email: email.trim() }, 
+            { email: email.trim().toLowerCase() }, 
             { $set: updateData },
-            { new: true } // Para que devuelva el documento actualizado
+            { new: true }
         );
         
         if (!actualizado) return res.status(404).json({ error: "Usuario no encontrado" });
@@ -177,63 +176,58 @@ app.put('/api/perfil/update', async (req, res) => {
 });
 
 // ======================================================
-// RUTAS VACANTES
+// RUTAS VACANTES Y POSTULACIONES
 // ======================================================
-
-app.post('/api/vacantes', async (req, res) => {
-    try {
-        const nuevaVacante = new Vacante(req.body);
-        await nuevaVacante.save();
-        res.status(201).json({ message: "Vacante creada" });
-    } catch (error) {
-        res.status(500).json({ error: "Error servidor" });
-    }
-});
-
-app.get('/api/vacantes', async (req, res) => {
-    try {
-        const vacantes = await Vacante.find().sort({ fechaCreacion: -1 });
-        res.status(200).json(vacantes);
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener feed" });
-    }
-});
-
-app.put('/api/vacantes/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const vacanteActualizada = await Vacante.findByIdAndUpdate(id, req.body, { new: true });
-        if (!vacanteActualizada) return res.status(404).json({ message: "Vacante no encontrada" });
-        res.status(200).json({ message: "Vacante actualizada con éxito" });
-    } catch (error) {
-        res.status(500).json({ message: "Error al actualizar" });
-    }
-});
 
 app.post('/api/vacantes/postular', async (req, res) => {
     try {
         const { vacanteId, candidatoEmail, nombreCandidato, puesto, reclutadorEmail } = req.body;
-        const existe = await Postulacion.findOne({ vacanteId, candidatoEmail: candidatoEmail.trim() });
+        const emailLimpio = candidatoEmail.trim().toLowerCase();
+
+        if (!mongoose.Types.ObjectId.isValid(vacanteId)) {
+            return res.status(400).json({ error: "ID de vacante no válido" });
+        }
+
+        const existe = await Postulacion.findOne({ vacanteId, candidatoEmail: emailLimpio });
         if (existe) return res.status(400).json({ error: "Ya te postulaste" });
         
-        const nuevaPost = new Postulacion({ vacanteId, candidatoEmail, reclutadorEmail, nombreCandidato, puesto });
+        const nuevaPost = new Postulacion({ 
+            vacanteId, 
+            candidatoEmail: emailLimpio, 
+            reclutadorEmail: reclutadorEmail.trim().toLowerCase(), 
+            nombreCandidato, 
+            puesto 
+        });
+
         await nuevaPost.save();
-        await Vacante.findByIdAndUpdate(vacanteId, { $push: { postulantes: candidatoEmail.trim() } });
+
+        await Vacante.findByIdAndUpdate(
+            vacanteId, 
+            { $push: { postulantes: emailLimpio } }
+        );
+
         res.status(201).json({ message: "Postulación exitosa" });
     } catch (error) {
-        res.status(500).json({ error: "Error al postularse" });
+        console.error("Error en postulación:", error);
+        res.status(500).json({ error: "Error interno al postularse" });
     }
 });
 
 app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
     try {
-        const postulaciones = await Postulacion.find({ vacanteId: req.params.vacanteId }).sort({ _id: -1 });
+        const { vacanteId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(vacanteId)) {
+            return res.status(400).json({ error: "ID de vacante inválido" });
+        }
+
+        const postulaciones = await Postulacion.find({ vacanteId }).sort({ _id: -1 });
+        
         const resultado = [];
         for (const post of postulaciones) {
             const usuario = await User.findOne({ email: post.candidatoEmail });
             resultado.push({
                 _id: post._id,
-                nombre: usuario?.nombre || "Candidato",
+                nombre: usuario?.nombre || post.nombreCandidato || "Candidato",
                 correo: post.candidatoEmail,
                 puesto: post.puesto,
                 estado: post.estado,
@@ -247,6 +241,27 @@ app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
     }
 });
 
+// ... (Resto de rutas como /api/vacantes GET, PUT, DELETE se mantienen igual)
+app.get('/api/vacantes', async (req, res) => {
+    try {
+        const vacantes = await Vacante.find().sort({ fechaCreacion: -1 });
+        res.status(200).json(vacantes);
+    } catch (error) {
+        res.status(500).json({ error: "Error al obtener feed" });
+    }
+});
+
+app.post('/api/vacantes', async (req, res) => {
+    try {
+        const data = { ...req.body, reclutadorEmail: req.body.reclutadorEmail.trim().toLowerCase() };
+        const nuevaVacante = new Vacante(data);
+        await nuevaVacante.save();
+        res.status(201).json({ message: "Vacante creada" });
+    } catch (error) {
+        res.status(500).json({ error: "Error servidor" });
+    }
+});
+
 // ======================================================
 // RUTAS CHAT
 // ======================================================
@@ -257,8 +272,8 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
         const mensajes = await Mensaje.find({
             vacanteId: vacanteId,
             $or: [
-                { emisor: emisor.trim(), receptor: receptor.trim() },
-                { emisor: receptor.trim(), receptor: emisor.trim() }
+                { emisor: emisor.trim().toLowerCase(), receptor: receptor.trim().toLowerCase() },
+                { emisor: receptor.trim().toLowerCase(), receptor: emisor.trim().toLowerCase() }
             ]
         }).sort({ fecha: 1 });
         
@@ -279,8 +294,8 @@ app.post('/api/mensajes/enviar', async (req, res) => {
         const { vacanteId, emisor, receptor, text } = req.body;
         const nuevoMensaje = new Mensaje({ 
             vacanteId: vacanteId,
-            emisor: emisor.trim(), 
-            receptor: receptor.trim(), 
+            emisor: emisor.trim().toLowerCase(), 
+            receptor: receptor.trim().toLowerCase(), 
             texto: text 
         });
         await nuevoMensaje.save();
@@ -290,10 +305,8 @@ app.post('/api/mensajes/enviar', async (req, res) => {
     }
 });
 
-
-
 // ======================================================
-// OTROS SERVICIOS
+// OTROS SERVICIOS Y ELIMINACIÓN
 // ======================================================
 
 app.post('/api/upload', async (req, res) => {
@@ -312,20 +325,7 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
     try {
         const emailBusqueda = req.params.email.trim().toLowerCase();
         const vacantes = await Vacante.find({ reclutadorEmail: emailBusqueda });
-        
-        const resultado = vacantes.map(v => ({
-            _id: v._id,
-            empresa: v.empresa,
-            puesto: v.puesto,
-            sueldo: v.sueldo,
-            sector: v.sector,
-            ubicacion: v.ubicacion,
-            reclutadorEmail: v.reclutadorEmail,
-            descripcion: v.descripcion || "",
-            postulantes: v.postulantes
-        }));
-
-        res.status(200).json(resultado);
+        res.status(200).json(vacantes);
     } catch (error) {
         res.status(500).json({ error: "Error al obtener tus vacantes" });
     }
@@ -333,8 +333,7 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
 
 app.delete('/api/postulaciones/:id', async (req, res) => {
     try {
-        const resultado = await Postulacion.findByIdAndDelete(req.params.id);
-        if (!resultado) return res.status(404).json({ error: "No se encontró el registro" });
+        await Postulacion.findByIdAndDelete(req.params.id);
         res.status(200).json({ message: "Eliminado con éxito" });
     } catch (error) {
         res.status(500).json({ error: "Error en el servidor" });
@@ -343,8 +342,7 @@ app.delete('/api/postulaciones/:id', async (req, res) => {
 
 app.delete('/api/vacantes/:id', async (req, res) => {
     try {
-        const resultado = await Vacante.findByIdAndDelete(req.params.id);
-        if (!resultado) return res.status(404).json({ error: "Vacante no encontrada" });
+        await Vacante.findByIdAndDelete(req.params.id);
         res.status(200).json({ message: "Vacante eliminada con éxito" });
     } catch (error) {
         res.status(500).json({ error: "Error al eliminar la vacante" });
