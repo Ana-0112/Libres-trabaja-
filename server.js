@@ -148,18 +148,26 @@ app.get('/api/perfil/:email', async (req, res) => {
 });
 
 app.put('/api/perfil/update', async (req, res) => {
-    const { email, nombre, nombres, fotoPerfil, cvUrl, empresa, ubicacion, fotosEmpresa } = req.body;
+    // Agregamos 'telefono' a la desestructuración
+    const { email, nombre, nombres, telefono, fotoPerfil, cvUrl, empresa, ubicacion, fotosEmpresa } = req.body;
     try {
         const updateData = {};
         if (nombre || nombres) updateData.nombre = nombre || nombres;
+        if (telefono) updateData.telefono = telefono; // <--- ESTO FALTABA
         if (fotoPerfil) updateData.fotoPerfil = fotoPerfil;
         if (cvUrl) updateData.cvUrl = cvUrl;
         if (empresa) updateData.empresa = empresa;
         if (ubicacion) updateData.ubicacion = ubicacion;
         if (fotosEmpresa) updateData.fotosEmpresa = fotosEmpresa;
 
-        await User.findOneAndUpdate({ email: email.trim() }, { $set: updateData });
-        res.status(200).json({ message: "Perfil actualizado" });
+        const actualizado = await User.findOneAndUpdate(
+            { email: email.trim() }, 
+            { $set: updateData },
+            { new: true } // Para que devuelva el documento actualizado
+        );
+        
+        if (!actualizado) return res.status(404).json({ error: "Usuario no encontrado" });
+        res.status(200).json({ message: "Perfil actualizado", user: actualizado });
     } catch (error) {
         res.status(500).json({ error: "Error al actualizar" });
     }
