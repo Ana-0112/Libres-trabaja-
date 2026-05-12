@@ -201,9 +201,10 @@ app.post('/api/vacantes/postular', async (req, res) => {
 
         await nuevaPost.save();
 
+       
         await Vacante.findByIdAndUpdate(
-            vacanteId, 
-            { $push: { postulantes: emailLimpio } }
+          vacanteId, 
+          { $addToSet: { postulantes: emailLimpio } } // $addToSet evita duplicados
         );
 
         res.status(201).json({ message: "Postulación exitosa" });
@@ -346,6 +347,16 @@ app.delete('/api/vacantes/:id', async (req, res) => {
         res.status(200).json({ message: "Vacante eliminada con éxito" });
     } catch (error) {
         res.status(500).json({ error: "Error al eliminar la vacante" });
+    }
+});
+
+app.patch('/api/postulaciones/:id/estado', async (req, res) => {
+    try {
+        const { estado } = req.body;
+        await Postulacion.findByIdAndUpdate(req.params.id, { estado });
+        res.status(200).json({ message: "Estado actualizado" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al actualizar estado" });
     }
 });
 
