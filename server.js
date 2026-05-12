@@ -440,7 +440,31 @@ app.delete('/api/vacantes/:id', async (req, res) => {
         res.status(500).json({ message: "Error interno del servidor" });
     }
 });
+// ==========================================================
+// ELIMINAR POSTULACIÓN (CANDIDATO)
+// ==========================================
 
+app.delete('/api/postulaciones/:id', async (req, res) => {
+    try {
+        // Buscamos la postulación por el ID enviado desde la app
+        const postulacionEliminada = await Postulacion.findByIdAndDelete(req.params.id);
+
+        if (!postulacionEliminada) {
+            return res.status(404).json({ 
+                message: "La postulación no existe o ya fue eliminada" 
+            });
+        }
+
+        res.status(200).json({
+            message: "Postulación retirada con éxito"
+        });
+    } catch (e) {
+        console.error("Error al eliminar postulación:", e);
+        res.status(500).json({ 
+            message: "Hubo un error en el servidor al intentar eliminar" 
+        });
+    }
+});
 // ======================================================
 // ACTUALIZAR VACANTE
 // ======================================================
