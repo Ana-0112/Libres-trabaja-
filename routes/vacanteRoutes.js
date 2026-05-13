@@ -3,14 +3,14 @@ const express = require('express');
 const router = express.Router();
 
 const {
-
     crearVacante,
     getVacantes,
     getVacantesReclutador
-
 } = require('../controllers/vacanteCtrl');
 
-const { postular } = require('../controllers/postulacionCtrl');
+const {
+    postular
+} = require('../controllers/postulacionCtrl');
 
 router.post('/', crearVacante);
 
