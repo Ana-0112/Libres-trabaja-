@@ -1,5 +1,5 @@
 const Mensaje = require('../models/mensaje');
-const User = require('../models/User');
+const User = require('../models/user');
 const admin = require('../config/firebase');
 
 const getMensajes = async (req, res) => {

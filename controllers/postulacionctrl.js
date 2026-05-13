@@ -1,6 +1,6 @@
 const Postulacion = require('../models/postulacion');
-const Vacante = require('../models/Vacante');
-const User = require('../models/User');
+const Vacante = require('../models/vacante');
+const User = require('../models/user');
 
 const postular = async (req, res) => {
 
