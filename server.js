@@ -100,7 +100,7 @@ const User = mongoose.model('User', new mongoose.Schema({
     },
 
     // ======================================================
-    // NUEVO CAMPO FCM TOKEN
+    // TOKEN FIREBASE
     // ======================================================
 
     fcmToken: {
@@ -109,6 +109,39 @@ const User = mongoose.model('User', new mongoose.Schema({
     }
 
 }), 'users');
+
+// ======================================================
+// MODELO MENSAJES
+// ======================================================
+
+const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
+
+    vacanteId: {
+        type: String,
+        default: ""
+    },
+
+    emisor: {
+        type: String,
+        default: ""
+    },
+
+    receptor: {
+        type: String,
+        default: ""
+    },
+
+    texto: {
+        type: String,
+        default: ""
+    },
+
+    fecha: {
+        type: Date,
+        default: Date.now
+    }
+
+}), 'mensajes');
 
 // ======================================================
 // LOGIN
@@ -233,6 +266,11 @@ app.put('/api/perfil/update', async (req, res) => {
 
 app.put('/api/users/fcm-token', async (req, res) => {
 
+    console.log("=================================");
+    console.log("TOKEN RECIBIDO DESDE ANDROID");
+    console.log(req.body);
+    console.log("=================================");
+
     try {
 
         const {
@@ -242,10 +280,11 @@ app.put('/api/users/fcm-token', async (req, res) => {
 
         if (!email || !fcmToken) {
 
+            console.log("FALTAN DATOS");
+
             return res.status(400).json({
                 error: "Email y token requeridos"
             });
-
         }
 
         const actualizado = await User.findOneAndUpdate(
@@ -256,7 +295,7 @@ app.put('/api/users/fcm-token', async (req, res) => {
 
             {
                 $set: {
-                    fcmToken
+                    fcmToken: fcmToken
                 }
             },
 
@@ -268,20 +307,31 @@ app.put('/api/users/fcm-token', async (req, res) => {
 
         if (!actualizado) {
 
+            console.log("USUARIO NO ENCONTRADO");
+
             return res.status(404).json({
                 error: "Usuario no encontrado"
             });
-
         }
 
+        console.log("TOKEN GUARDADO EN MONGODB");
+
+        console.log(actualizado);
+
         res.status(200).json({
-            message: "FCM token guardado",
+
+            message: "FCM token guardado correctamente",
+
             user: actualizado
+
         });
 
     } catch (e) {
 
-        console.log("ERROR FCM TOKEN:", e);
+        console.log("=================================");
+        console.log("ERROR GUARDANDO TOKEN");
+        console.log(e);
+        console.log("=================================");
 
         res.status(500).json({
             error: "Error guardando token"
@@ -292,7 +342,7 @@ app.put('/api/users/fcm-token', async (req, res) => {
 });
 
 // ======================================================
-// CHAT ENVIAR MENSAJE
+// ENVIAR MENSAJE
 // ======================================================
 
 app.post('/api/mensajes/enviar', async (req, res) => {
@@ -332,9 +382,9 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 
         });
 
-        console.log("TOKEN RECEPTOR:", receptorUser?.fcmToken);
+        console.log("TOKEN RECEPTOR:");
 
-        // Aquí luego mandarás la notificación push
+        console.log(receptorUser?.fcmToken);
 
         res.status(201).json({
             message: "Mensaje enviado"
@@ -353,37 +403,40 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 });
 
 // ======================================================
-// MODELO MENSAJES
+// UPLOAD CLOUDINARY
 // ======================================================
 
-const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
+app.post('/api/upload', async (req, res) => {
 
-    vacanteId: {
-        type: String,
-        default: ""
-    },
+    try {
 
-    emisor: {
-        type: String,
-        default: ""
-    },
+        const result =
+            await cloudinary.uploader.upload(
 
-    receptor: {
-        type: String,
-        default: ""
-    },
+                req.body.data,
 
-    texto: {
-        type: String,
-        default: ""
-    },
+                {
+                    folder: "libres_trabaja",
+                    resource_type: "auto"
+                }
 
-    fecha: {
-        type: Date,
-        default: Date.now
+            );
+
+        res.status(200).json({
+            url: result.secure_url
+        });
+
+    } catch (e) {
+
+        console.log("ERROR UPLOAD:", e);
+
+        res.status(500).json({
+            error: "Error upload"
+        });
+
     }
 
-}), 'mensajes');
+});
 
 // ======================================================
 // SERVER
