@@ -1,4 +1,4 @@
-const Mensaje = require('../models/Mensaje');
+const Mensaje = require('../models/mensaje');
 const User = require('../models/User');
 const admin = require('../config/firebase');
 

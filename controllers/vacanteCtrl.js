@@ -1,4 +1,4 @@
-const Vacante = require('../models/Vacante');
+const Vacante = require('../models/vacante');
 
 const crearVacante = async (req, res) => {
 

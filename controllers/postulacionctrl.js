@@ -1,4 +1,4 @@
-const Postulacion = require('../models/Postulacion');
+const Postulacion = require('../models/postulacion');
 const Vacante = require('../models/Vacante');
 const User = require('../models/User');
 
