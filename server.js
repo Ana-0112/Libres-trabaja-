@@ -842,6 +842,41 @@ app.post('/api/upload', async (req, res) => {
 });
 
 // ======================================================
+// GUARDAR TOKEN FIREBASE
+// ======================================================
+
+app.put('/api/users/token', async (req, res) => {
+
+    try {
+
+        const { email, fcmToken } = req.body;
+
+        await User.findOneAndUpdate(
+            {
+                email: email.trim().toLowerCase()
+            },
+            {
+                $set: { fcmToken }
+            }
+        );
+
+        res.json({
+            message: "Token guardado"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR TOKEN:", e);
+
+        res.status(500).json({
+            error: "Error guardando token"
+        });
+
+    }
+
+});
+
+// ======================================================
 // SERVER
 // ======================================================
 
