@@ -5,7 +5,46 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
 
+const admin = require('firebase-admin');
+
 const app = express();
+
+// ======================================================
+// FIREBASE ADMIN
+// ======================================================
+
+const firebaseServiceAccount = {
+
+    type: process.env.FIREBASE_TYPE,
+
+    project_id: process.env.FIREBASE_PROJECT_ID,
+
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+
+    private_key: process.env.FIREBASE_PRIVATE_KEY
+        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+        : undefined,
+
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+
+    client_id: process.env.FIREBASE_CLIENT_ID,
+
+    auth_uri: process.env.FIREBASE_AUTH_URI,
+
+    token_uri: process.env.FIREBASE_TOKEN_URI,
+
+    auth_provider_x509_cert_url:
+        process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+
+    client_x509_cert_url:
+        process.env.FIREBASE_CLIENT_X509_CERT_URL
+};
+
+admin.initializeApp({
+
+    credential: admin.credential.cert(firebaseServiceAccount)
+
+});
 
 // ======================================================
 // CONFIGURACIÓN
@@ -98,10 +137,6 @@ const User = mongoose.model('User', new mongoose.Schema({
         type: String,
         required: true
     },
-
-    // ======================================================
-    // FIREBASE TOKEN
-    // ======================================================
 
     fcmToken: {
         type: String,
@@ -1131,6 +1166,10 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 
         await nuevo.save();
 
+        // ======================================================
+        // BUSCAR RECEPTOR
+        // ======================================================
+
         const receptorUser = await User.findOne({
 
             email: receptor.trim().toLowerCase()
@@ -1139,6 +1178,61 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 
         console.log("TOKEN RECEPTOR:");
         console.log(receptorUser?.fcmToken);
+
+        // ======================================================
+        // ENVIAR PUSH FIREBASE
+        // ======================================================
+
+        if (receptorUser?.fcmToken) {
+
+            try {
+
+                await admin.messaging().send({
+
+                    token: receptorUser.fcmToken,
+
+                    notification: {
+
+                        title: "Nuevo mensaje",
+
+                        body: texto
+
+                    },
+
+                    data: {
+
+                        vacanteId: vacanteId || "",
+
+                        emisor: emisor || "",
+
+                        receptor: receptor || "",
+
+                        texto: texto || ""
+
+                    },
+
+                    android: {
+
+                        priority: "high"
+
+                    }
+
+                });
+
+                console.log("✅ NOTIFICACIÓN ENVIADA");
+
+            } catch (firebaseError) {
+
+                console.log("❌ ERROR FIREBASE:");
+                console.log(firebaseError);
+
+            }
+
+        } else {
+
+            console.log("❌ RECEPTOR SIN TOKEN");
+
+        }
 
         res.status(201).json({
             message: "Mensaje enviado"
