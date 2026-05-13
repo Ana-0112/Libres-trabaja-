@@ -53,7 +53,7 @@ mongoose.connect(process.env.MONGO_URI)
 });
 
 // ======================================================
-// MODELOS
+// MODELO USER
 // ======================================================
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -100,7 +100,7 @@ const User = mongoose.model('User', new mongoose.Schema({
     },
 
     // ======================================================
-    // TOKEN FIREBASE
+    // FIREBASE TOKEN
     // ======================================================
 
     fcmToken: {
@@ -109,6 +109,10 @@ const User = mongoose.model('User', new mongoose.Schema({
     }
 
 }), 'users');
+
+// ======================================================
+// MODELO VACANTES
+// ======================================================
 
 const Vacante = mongoose.model('Vacante', new mongoose.Schema({
 
@@ -153,6 +157,10 @@ const Vacante = mongoose.model('Vacante', new mongoose.Schema({
     }
 
 }), 'vacantes');
+
+// ======================================================
+// MODELO POSTULACIONES
+// ======================================================
 
 const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
 
@@ -203,6 +211,10 @@ const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
 
 }), 'postulaciones');
 
+// ======================================================
+// MODELO MENSAJES
+// ======================================================
+
 const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
 
     vacanteId: {
@@ -240,6 +252,9 @@ app.post('/api/login', async (req, res) => {
 
     try {
 
+        console.log("LOGIN BODY:");
+        console.log(req.body);
+
         const { email, password } = req.body;
 
         const user = await User.findOne({
@@ -252,11 +267,15 @@ app.post('/api/login', async (req, res) => {
 
         if (!user) {
 
+            console.log("USUARIO NO ENCONTRADO");
+
             return res.status(401).json({
                 error: "Usuario no encontrado"
             });
 
         }
+
+        console.log("LOGIN EXITOSO");
 
         res.status(200).json(user);
 
@@ -266,6 +285,71 @@ app.post('/api/login', async (req, res) => {
 
         res.status(500).json({
             error: "Error login"
+        });
+
+    }
+
+});
+
+// ======================================================
+// REGISTRO
+// ======================================================
+
+app.post('/api/registro', async (req, res) => {
+
+    try {
+
+        const {
+
+            nombre,
+            email,
+            password,
+            rol,
+            empresa,
+            telefono
+
+        } = req.body;
+
+        const existe = await User.findOne({
+
+            email: email.trim().toLowerCase()
+
+        });
+
+        if (existe) {
+
+            return res.status(400).json({
+                error: "El usuario ya existe"
+            });
+
+        }
+
+        const nuevoUsuario = new User({
+
+            nombre,
+
+            email: email.trim().toLowerCase(),
+
+            password,
+
+            rol,
+
+            empresa,
+
+            telefono
+
+        });
+
+        await nuevoUsuario.save();
+
+        res.status(201).json(nuevoUsuario);
+
+    } catch (e) {
+
+        console.log("ERROR REGISTRO:", e);
+
+        res.status(500).json({
+            error: "Error registro"
         });
 
     }
@@ -302,6 +386,42 @@ app.get('/api/perfil/:email', async (req, res) => {
 
         res.status(500).json({
             error: "Error perfil"
+        });
+
+    }
+
+});
+
+// ======================================================
+// PERFIL EMPRESA
+// ======================================================
+
+app.get('/api/perfil/empresa/:email', async (req, res) => {
+
+    try {
+
+        const empresa = await User.findOne({
+
+            email: req.params.email.trim().toLowerCase()
+
+        });
+
+        if (!empresa) {
+
+            return res.status(404).json({
+                error: "Empresa no encontrada"
+            });
+
+        }
+
+        res.status(200).json(empresa);
+
+    } catch (e) {
+
+        console.log("ERROR EMPRESA:", e);
+
+        res.status(500).json({
+            error: "Error empresa"
         });
 
     }
@@ -350,16 +470,107 @@ app.put('/api/perfil/update', async (req, res) => {
 });
 
 // ======================================================
-// GUARDAR FCM TOKEN
+// ACTUALIZAR CURRICULUM
+// ======================================================
+
+app.put('/api/perfil/curriculum', async (req, res) => {
+
+    try {
+
+        const { email, cvUrl } = req.body;
+
+        const actualizado = await User.findOneAndUpdate(
+
+            {
+                email: email.trim().toLowerCase()
+            },
+
+            {
+                $set: {
+                    cvUrl: cvUrl
+                }
+            },
+
+            {
+                new: true
+            }
+
+        );
+
+        res.status(200).json(actualizado);
+
+    } catch (e) {
+
+        console.log("ERROR CURRICULUM:", e);
+
+        res.status(500).json({
+            error: "Error curriculum"
+        });
+
+    }
+
+});
+
+// ======================================================
+// ELIMINAR CURRICULUM
+// ======================================================
+
+app.delete('/api/perfil/curriculum/:userId', async (req, res) => {
+
+    try {
+
+        const actualizado = await User.findByIdAndUpdate(
+
+            req.params.userId,
+
+            {
+                $set: {
+                    cvUrl: ""
+                }
+            },
+
+            {
+                new: true
+            }
+
+        );
+
+        res.status(200).json(actualizado);
+
+    } catch (e) {
+
+        console.log("ERROR ELIMINAR CV:", e);
+
+        res.status(500).json({
+            error: "Error eliminando curriculum"
+        });
+
+    }
+
+});
+
+// ======================================================
+// GUARDAR TOKEN FIREBASE
 // ======================================================
 
 app.put('/api/users/fcm-token', async (req, res) => {
 
-    console.log("TOKEN RECIBIDO:", req.body);
-
     try {
 
-        const { email, fcmToken } = req.body;
+        console.log("TOKEN RECIBIDO:");
+        console.log(req.body);
+
+        const {
+            email,
+            fcmToken
+        } = req.body;
+
+        if (!email || !fcmToken) {
+
+            return res.status(400).json({
+                error: "Email y token requeridos"
+            });
+        }
 
         const actualizado = await User.findOneAndUpdate(
 
@@ -376,19 +587,32 @@ app.put('/api/users/fcm-token', async (req, res) => {
             {
                 new: true
             }
+
         );
 
+        if (!actualizado) {
+
+            return res.status(404).json({
+                error: "Usuario no encontrado"
+            });
+        }
+
+        console.log("TOKEN GUARDADO");
+
         res.status(200).json({
+
             message: "FCM token guardado",
+
             user: actualizado
+
         });
 
     } catch (e) {
 
-        console.log("ERROR FCM:", e);
+        console.log("ERROR TOKEN:", e);
 
         res.status(500).json({
-            error: "Error guardando token"
+            error: "Error token"
         });
 
     }
@@ -460,6 +684,33 @@ app.get('/api/vacantes', async (req, res) => {
 });
 
 // ======================================================
+// FEED VACANTES
+// ======================================================
+
+app.get('/api/vacantes/feed', async (req, res) => {
+
+    try {
+
+        const vacantes = await Vacante.find()
+        .sort({
+            fechaCreacion: -1
+        });
+
+        res.status(200).json(vacantes);
+
+    } catch (e) {
+
+        console.log("ERROR FEED:", e);
+
+        res.status(500).json({
+            error: "Error feed"
+        });
+
+    }
+
+});
+
+// ======================================================
 // VACANTES RECLUTADOR
 // ======================================================
 
@@ -493,6 +744,61 @@ app.get('/api/vacantes/reclutador/:email', async (req, res) => {
 });
 
 // ======================================================
+// ELIMINAR VACANTE
+// ======================================================
+
+app.delete('/api/vacantes/:id', async (req, res) => {
+
+    try {
+
+        await Vacante.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            message: "Vacante eliminada"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR ELIMINAR VACANTE:", e);
+
+        res.status(500).json({
+            error: "Error eliminando vacante"
+        });
+
+    }
+
+});
+
+// ======================================================
+// ACTUALIZAR VACANTE
+// ======================================================
+
+app.put('/api/vacantes/:id', async (req, res) => {
+
+    try {
+
+        await Vacante.findByIdAndUpdate(
+            req.params.id,
+            req.body
+        );
+
+        res.status(200).json({
+            message: "Vacante actualizada"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR UPDATE VACANTE:", e);
+
+        res.status(500).json({
+            error: "Error actualizando vacante"
+        });
+
+    }
+
+});
+
+// ======================================================
 // POSTULARSE
 // ======================================================
 
@@ -511,11 +817,8 @@ app.post('/api/vacantes/postular', async (req, res) => {
             .toLowerCase();
 
         const existe = await Postulacion.findOne({
-
             vacanteId,
-
             candidatoEmail: email
-
         });
 
         if (existe) {
@@ -551,15 +854,12 @@ app.post('/api/vacantes/postular', async (req, res) => {
         await nueva.save();
 
         await Vacante.findByIdAndUpdate(
-
             vacanteId,
-
             {
                 $addToSet: {
                     postulantes: email
                 }
             }
-
         );
 
         res.status(201).json({
@@ -579,7 +879,7 @@ app.post('/api/vacantes/postular', async (req, res) => {
 });
 
 // ======================================================
-// POSTULACIONES DEL USUARIO
+// POSTULACIONES USUARIO
 // ======================================================
 
 app.get('/api/postulaciones/usuario/:email', async (req, res) => {
@@ -604,6 +904,140 @@ app.get('/api/postulaciones/usuario/:email', async (req, res) => {
 
         res.status(500).json({
             error: "Error postulaciones"
+        });
+
+    }
+
+});
+
+// ======================================================
+// VER POSTULANTES
+// ======================================================
+
+app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
+
+    try {
+
+        const postulaciones =
+            await Postulacion.find({
+                vacanteId: req.params.vacanteId
+            });
+
+        const resultado = await Promise.all(
+
+            postulaciones.map(async (post) => {
+
+                const usuario =
+                    await User.findOne({
+                        email: post.candidatoEmail
+                    });
+
+                return {
+
+                    _id: post._id,
+
+                    nombre:
+                        usuario?.nombre || "",
+
+                    correo:
+                        post.candidatoEmail || "",
+
+                    puesto:
+                        post.puesto || "",
+
+                    estado:
+                        post.estado || "",
+
+                    mensaje:
+                        post.mensaje || "",
+
+                    entrevista:
+                        post.entrevistaFecha || "",
+
+                    fotoPerfil:
+                        usuario?.fotoPerfil || "",
+
+                    cvUrl:
+                        usuario?.cvUrl || ""
+
+                };
+
+            })
+
+        );
+
+        res.status(200).json(resultado);
+
+    } catch (e) {
+
+        console.log("ERROR POSTULANTES:", e);
+
+        res.status(500).json({
+            error: "Error postulantes"
+        });
+
+    }
+
+});
+
+// ======================================================
+// ELIMINAR POSTULANTE
+// ======================================================
+
+app.delete('/api/postulaciones/:id', async (req, res) => {
+
+    try {
+
+        await Postulacion.findByIdAndDelete(
+            req.params.id
+        );
+
+        res.status(200).json({
+            message: "Postulante eliminado"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR ELIMINAR POSTULANTE:", e);
+
+        res.status(500).json({
+            error: "Error eliminando postulante"
+        });
+
+    }
+
+});
+
+// ======================================================
+// MENSAJE A CANDIDATO
+// ======================================================
+
+app.put('/api/postulaciones/mensaje/:id', async (req, res) => {
+
+    try {
+
+        await Postulacion.findByIdAndUpdate(
+
+            req.params.id,
+
+            {
+                $set: {
+                    mensaje: req.body.mensaje
+                }
+            }
+
+        );
+
+        res.status(200).json({
+            message: "Mensaje enviado"
+        });
+
+    } catch (e) {
+
+        console.log("ERROR MENSAJE:", e);
+
+        res.status(500).json({
+            error: "Error mensaje"
         });
 
     }
@@ -656,7 +1090,7 @@ app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
 
     } catch (e) {
 
-        console.log("ERROR CHAT:", e);
+        console.log("ERROR CHAT GET:", e);
 
         res.status(500).json({
             error: "Error chat"
@@ -704,7 +1138,6 @@ app.post('/api/mensajes/enviar', async (req, res) => {
         });
 
         console.log("TOKEN RECEPTOR:");
-
         console.log(receptorUser?.fcmToken);
 
         res.status(201).json({
@@ -724,7 +1157,7 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 });
 
 // ======================================================
-// UPLOAD CLOUDINARY
+// SUBIR ARCHIVOS CLOUDINARY
 // ======================================================
 
 app.post('/api/upload', async (req, res) => {
@@ -767,6 +1200,6 @@ const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, '0.0.0.0', () => {
 
-    console.log(`Servidor activo puerto ${PORT}`);
+    console.log(`🚀 Servidor activo puerto ${PORT}`);
 
 });
