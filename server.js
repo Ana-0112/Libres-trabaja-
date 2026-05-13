@@ -53,7 +53,7 @@ mongoose.connect(process.env.MONGO_URI)
 });
 
 // ======================================================
-// MODELOS
+// MODELO USER
 // ======================================================
 
 const User = mongoose.model('User', new mongoose.Schema({
@@ -97,131 +97,18 @@ const User = mongoose.model('User', new mongoose.Schema({
     password: {
         type: String,
         required: true
+    },
+
+    // ======================================================
+    // NUEVO CAMPO FCM TOKEN
+    // ======================================================
+
+    fcmToken: {
+        type: String,
+        default: ""
     }
 
 }), 'users');
-
-const Vacante = mongoose.model('Vacante', new mongoose.Schema({
-
-    empresa: {
-        type: String,
-        default: ""
-    },
-
-    puesto: {
-        type: String,
-        default: ""
-    },
-
-    sueldo: {
-        type: String,
-        default: ""
-    },
-
-    sector: {
-        type: String,
-        default: ""
-    },
-
-    ubicacion: {
-        type: String,
-        default: ""
-    },
-
-    reclutadorEmail: {
-        type: String,
-        default: ""
-    },
-
-    postulantes: {
-        type: Array,
-        default: []
-    },
-
-    fechaCreacion: {
-        type: Date,
-        default: Date.now
-    }
-
-}), 'vacantes');
-
-const Postulacion = mongoose.model('Postulacion', new mongoose.Schema({
-
-    vacanteId: {
-        type: String,
-        default: ""
-    },
-
-    candidatoEmail: {
-        type: String,
-        default: ""
-    },
-
-    reclutadorEmail: {
-        type: String,
-        default: ""
-    },
-
-    nombreCandidato: {
-        type: String,
-        default: ""
-    },
-
-    puesto: {
-        type: String,
-        default: ""
-    },
-
-    empresa: {
-        type: String,
-        default: ""
-    },
-
-    estado: {
-        type: String,
-        default: "Pendiente"
-    },
-
-    mensaje: {
-        type: String,
-        default: ""
-    },
-
-    entrevistaFecha: {
-        type: String,
-        default: ""
-    }
-
-}), 'postulaciones');
-
-const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
-
-    vacanteId: {
-        type: String,
-        default: ""
-    },
-
-    emisor: {
-        type: String,
-        default: ""
-    },
-
-    receptor: {
-        type: String,
-        default: ""
-    },
-
-    texto: {
-        type: String,
-        default: ""
-    },
-
-    fecha: {
-        type: Date,
-        default: Date.now
-    }
-
-}), 'mensajes');
 
 // ======================================================
 // LOGIN
@@ -341,474 +228,63 @@ app.put('/api/perfil/update', async (req, res) => {
 });
 
 // ======================================================
-// CREAR VACANTE
+// GUARDAR FCM TOKEN
 // ======================================================
 
-app.post('/api/vacantes', async (req, res) => {
-
-    try {
-
-        const nueva = new Vacante({
-
-            ...req.body,
-
-            reclutadorEmail:
-                req.body.reclutadorEmail
-                .trim()
-                .toLowerCase()
-
-        });
-
-        await nueva.save();
-
-        res.status(201).json({
-            message: "Vacante creada"
-        });
-
-    } catch (e) {
-
-        console.log("ERROR CREAR VACANTE:", e);
-
-        res.status(500).json({
-            error: "Error creando vacante"
-        });
-
-    }
-
-});
-
-// ======================================================
-// OBTENER TODAS LAS VACANTES
-// ======================================================
-
-app.get('/api/vacantes', async (req, res) => {
-
-    try {
-
-        const vacantes = await Vacante.find()
-        .sort({
-            fechaCreacion: -1
-        });
-
-        res.status(200).json(vacantes);
-
-    } catch (e) {
-
-        console.log("ERROR VACANTES:", e);
-
-        res.status(500).json({
-            error: "Error vacantes"
-        });
-
-    }
-
-});
-
-// ======================================================
-// VACANTES DEL RECLUTADOR
-// ======================================================
-
-app.get('/api/vacantes/reclutador/:email', async (req, res) => {
-
-    try {
-
-        const email =
-            req.params.email
-            .trim()
-            .toLowerCase();
-
-        const vacantes = await Vacante.find({
-            reclutadorEmail: email
-        }).sort({
-            fechaCreacion: -1
-        });
-
-        res.status(200).json(vacantes);
-
-    } catch (e) {
-
-        console.log("ERROR VACANTES RECLUTADOR:", e);
-
-        res.status(500).json({
-            error: "Error vacantes reclutador"
-        });
-
-    }
-
-});
-
-// ======================================================
-// ELIMINAR VACANTE
-// ======================================================
-
-app.delete('/api/vacantes/:id', async (req, res) => {
-
-    try {
-
-        const result =
-            await Vacante.findByIdAndDelete(req.params.id);
-
-        if (!result) {
-
-            return res.status(404).json({
-                message: "Vacante no encontrada"
-            });
-
-        }
-
-        res.status(200).json({
-            message: "Vacante eliminada"
-        });
-
-    } catch (e) {
-
-        console.error("ERROR ELIMINAR VACANTE:", e);
-
-        res.status(500).json({
-            message: "Error interno del servidor"
-        });
-
-    }
-
-});
-
-// ======================================================
-// ACTUALIZAR VACANTE
-// ======================================================
-
-app.put('/api/vacantes/:id', async (req, res) => {
-
-    try {
-
-        await Vacante.findByIdAndUpdate(
-            req.params.id,
-            req.body
-        );
-
-        res.status(200).json({
-            message: "Vacante actualizada"
-        });
-
-    } catch (e) {
-
-        console.log("ERROR UPDATE VACANTE:", e);
-
-        res.status(500).json({
-            error: "Error actualizando vacante"
-        });
-
-    }
-
-});
-
-// ======================================================
-// POSTULARSE
-// ======================================================
-
-app.post('/api/vacantes/postular', async (req, res) => {
+app.put('/api/users/fcm-token', async (req, res) => {
 
     try {
 
         const {
-            vacanteId,
-            candidatoEmail
+            email,
+            fcmToken
         } = req.body;
 
-        const email =
-            candidatoEmail
-            .trim()
-            .toLowerCase();
-
-        const existe = await Postulacion.findOne({
-
-            vacanteId,
-
-            candidatoEmail: email
-
-        });
-
-        if (existe) {
+        if (!email || !fcmToken) {
 
             return res.status(400).json({
-                error: "Ya te postulaste"
+                error: "Email y token requeridos"
             });
 
         }
 
-        const vacante =
-            await Vacante.findById(vacanteId);
-
-        const usuario =
-            await User.findOne({
-                email
-            });
-
-        const nueva = new Postulacion({
-
-            ...req.body,
-
-            candidatoEmail: email,
-
-            reclutadorEmail:
-                vacante?.reclutadorEmail || "",
-
-            nombreCandidato:
-                usuario?.nombre || ""
-
-        });
-
-        await nueva.save();
-
-        await Vacante.findByIdAndUpdate(
-
-            vacanteId,
+        const actualizado = await User.findOneAndUpdate(
 
             {
-                $addToSet: {
-                    postulantes: email
+                email: email.trim().toLowerCase()
+            },
+
+            {
+                $set: {
+                    fcmToken
                 }
+            },
+
+            {
+                new: true
             }
 
         );
 
-        res.status(201).json({
-            message: "Postulación exitosa"
-        });
-
-    } catch (e) {
-
-        console.log("ERROR POSTULACIÓN:", e);
-
-        res.status(500).json({
-            error: "Error postulación"
-        });
-
-    }
-
-});
-
-// ======================================================
-// POSTULACIONES DEL CANDIDATO
-// ======================================================
-
-app.get('/api/postulaciones/usuario/:email', async (req, res) => {
-
-    try {
-
-        const email =
-            req.params.email
-            .trim()
-            .toLowerCase();
-
-        const postulaciones =
-            await Postulacion.find({
-                candidatoEmail: email
-            });
-
-        res.status(200).json(postulaciones);
-
-    } catch (e) {
-
-        console.log("ERROR POSTULACIONES:", e);
-
-        res.status(500).json({
-            error: "Error postulaciones"
-        });
-
-    }
-
-});
-
-// ======================================================
-// VER POSTULANTES
-// ======================================================
-
-app.get('/api/vacantes/postulantes/:vacanteId', async (req, res) => {
-
-    try {
-
-        const postulaciones =
-            await Postulacion.find({
-                vacanteId: req.params.vacanteId
-            });
-
-        const resultado = await Promise.all(
-
-            postulaciones.map(async (post) => {
-
-                const usuario =
-                    await User.findOne({
-                        email: post.candidatoEmail
-                    });
-
-                return {
-
-                    _id: post._id,
-
-                    nombre:
-                        usuario?.nombre || "",
-
-                    correo:
-                        post.candidatoEmail || "",
-
-                    puesto:
-                        post.puesto || "",
-
-                    estado:
-                        post.estado || "",
-
-                    mensaje:
-                        post.mensaje || "",
-
-                    entrevista:
-                        post.entrevistaFecha || "",
-
-                    fotoPerfil:
-                        usuario?.fotoPerfil || "",
-
-                    cvUrl:
-                        usuario?.cvUrl || ""
-
-                };
-
-            })
-
-        );
-
-        res.status(200).json(resultado);
-
-    } catch (e) {
-
-        console.log("ERROR POSTULANTES:", e);
-
-        res.status(500).json({
-            error: "Error postulantes"
-        });
-
-    }
-
-});
-
-// ======================================================
-// ELIMINAR POSTULACIÓN
-// ======================================================
-
-app.delete('/api/postulaciones/:id', async (req, res) => {
-
-    try {
-
-        const postulacionEliminada =
-            await Postulacion.findByIdAndDelete(req.params.id);
-
-        if (!postulacionEliminada) {
+        if (!actualizado) {
 
             return res.status(404).json({
-                message: "La postulación no existe"
+                error: "Usuario no encontrado"
             });
 
         }
 
-        // Eliminar también del arreglo postulantes
-        await Vacante.findByIdAndUpdate(
-
-            postulacionEliminada.vacanteId,
-
-            {
-                $pull: {
-                    postulantes:
-                        postulacionEliminada.candidatoEmail
-                }
-            }
-
-        );
-
         res.status(200).json({
-            message: "Postulación eliminada correctamente"
+            message: "FCM token guardado",
+            user: actualizado
         });
 
     } catch (e) {
 
-        console.error("ERROR ELIMINAR POSTULACIÓN:", e);
+        console.log("ERROR FCM TOKEN:", e);
 
         res.status(500).json({
-            message: "Error interno del servidor"
-        });
-
-    }
-
-});
-
-// ======================================================
-// CHAT OBTENER MENSAJES
-// ======================================================
-
-app.get('/api/mensajes/:vacanteId/:emisor/:receptor', async (req, res) => {
-
-    try {
-
-        const {
-            vacanteId,
-            emisor,
-            receptor
-        } = req.params;
-
-        const e =
-            emisor.trim().toLowerCase();
-
-        const r =
-            receptor.trim().toLowerCase();
-
-        const mensajes = await Mensaje.find({
-
-            vacanteId,
-
-            $or: [
-
-                {
-                    emisor: e,
-                    receptor: r
-                },
-
-                {
-                    emisor: r,
-                    receptor: e
-                }
-
-            ]
-
-        }).sort({
-            fecha: 1
-        });
-
-        res.status(200).json(
-
-            mensajes.map(m => ({
-
-                texto: m.texto,
-
-                emisor: m.emisor,
-
-                receptor: m.receptor,
-
-                time:
-                    m.fecha
-                    ? new Date(m.fecha)
-                        .toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        })
-                    : ""
-
-            }))
-
-        );
-
-    } catch (e) {
-
-        console.log("ERROR CHAT GET:", e);
-
-        res.status(500).json({
-            error: "Error chat"
+            error: "Error guardando token"
         });
 
     }
@@ -846,6 +322,20 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 
         await nuevo.save();
 
+        // ======================================================
+        // OBTENER TOKEN DEL RECEPTOR
+        // ======================================================
+
+        const receptorUser = await User.findOne({
+
+            email: receptor.trim().toLowerCase()
+
+        });
+
+        console.log("TOKEN RECEPTOR:", receptorUser?.fcmToken);
+
+        // Aquí luego mandarás la notificación push
+
         res.status(201).json({
             message: "Mensaje enviado"
         });
@@ -863,40 +353,37 @@ app.post('/api/mensajes/enviar', async (req, res) => {
 });
 
 // ======================================================
-// UPLOAD CLOUDINARY
+// MODELO MENSAJES
 // ======================================================
 
-app.post('/api/upload', async (req, res) => {
+const Mensaje = mongoose.model('Mensaje', new mongoose.Schema({
 
-    try {
+    vacanteId: {
+        type: String,
+        default: ""
+    },
 
-        const result =
-            await cloudinary.uploader.upload(
+    emisor: {
+        type: String,
+        default: ""
+    },
 
-                req.body.data,
+    receptor: {
+        type: String,
+        default: ""
+    },
 
-                {
-                    folder: "libres_trabaja",
-                    resource_type: "auto"
-                }
+    texto: {
+        type: String,
+        default: ""
+    },
 
-            );
-
-        res.status(200).json({
-            url: result.secure_url
-        });
-
-    } catch (e) {
-
-        console.log("ERROR UPLOAD:", e);
-
-        res.status(500).json({
-            error: "Error upload"
-        });
-
+    fecha: {
+        type: Date,
+        default: Date.now
     }
 
-});
+}), 'mensajes');
 
 // ======================================================
 // SERVER
@@ -906,6 +393,6 @@ const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, '0.0.0.0', () => {
 
-    console.log(` Servidor activo puerto ${PORT}`);
+    console.log(`Servidor activo puerto ${PORT}`);
 
 });
