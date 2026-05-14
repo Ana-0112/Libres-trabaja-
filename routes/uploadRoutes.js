@@ -4,7 +4,7 @@ const router = express.Router();
 
 const {
     uploadArchivo
-} = require('../controllers/uploadCtrl');
+} = require('../controllers/tempUpload');
 
 router.post('/', uploadArchivo);
 
