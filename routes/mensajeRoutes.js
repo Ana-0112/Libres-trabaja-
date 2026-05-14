@@ -5,7 +5,7 @@ const router = express.Router();
 const {
     getMensajes,
     enviarMensaje
-} = require('../controllers/abcMensaje');
+} = require('../controllers/mensajeCtrl');
 
 router.get('/:vacanteId/:emisor/:receptor', getMensajes);
 
