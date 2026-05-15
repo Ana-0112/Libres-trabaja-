@@ -1,8 +1,9 @@
-const Postulacion = require('../models/postulacion');
-const Vacante = require('../models/vacante');
-const User = require('../models/user');
+const path = require('path');
+const Postulacion = require(path.join(__dirname, '..', 'models', 'postulacion'));
+const Vacante = require(path.join(__dirname, '..', 'models', 'vacante'));
+const User = require(path.join(__dirname, '..', 'models', 'user'));
 
-const postular = async (req, res) => {
+const posting = async (req, res) => {
 
     try {
 
@@ -79,6 +80,88 @@ const postular = async (req, res) => {
 
 };
 
+// Funciones adicionales para las rutas
+
+const getPostulacionesUsuario = async (req, res) => {
+    try {
+        const email = req.params.email.trim().toLowerCase();
+        const postulaciones = await Postulacion.find({
+            $or: [
+                { candidatoEmail: email },
+                { reclutadorEmail: email }
+            ]
+        }).sort({ _id: -1 });
+        res.json(postulaciones);
+    } catch (e) {
+        res.status(500).json({ error: "Error al obtener postulaciones" });
+    }
+};
+
+const getPostulantesVacante = async (req, res) => {
+    try {
+        const vacanteId = req.params.vacanteId;
+        const postulaciones = await Postulacion.find({ vacanteId });
+        const postulantes = await Promise.all(
+            postulaciones.map(async (p) => {
+                const usuario = await User.findOne({ email: p.candidatoEmail });
+                return {
+                    _id: p._id,
+                    nombre: p.nombreCandidato || usuario?.nombre || "Sin nombre",
+                    correo: p.candidatoEmail,
+                    puesto: p.puesto,
+                    estado: p.estado || "Pendiente",
+                    mensaje: p.mensaje,
+                    entrevista: p.entrevistaFecha,
+                    fotoPerfil: usuario?.fotoPerfil || null,
+                    cvUrl: usuario?.cvUrl || null
+                };
+            })
+        );
+        res.json(postulantes);
+    } catch (e) {
+        res.status(500).json({ error: "Error al obtener postulantes" });
+    }
+};
+
+const eliminarPostulacion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const postulacion = await Postulacion.findById(id);
+        if (!postulacion) {
+            return res.status(404).json({ error: "Postulación no encontrada" });
+        }
+        await Postulacion.findByIdAndDelete(id);
+        await Vacante.findByIdAndUpdate(
+            postulacion.vacanteId,
+            { $pull: { postulantes: postulacion.candidatoEmail } }
+        );
+        res.json({ message: "Postulación eliminada" });
+    } catch (e) {
+        res.status(500).json({ error: "Error al eliminar postulación" });
+    }
+};
+
+const enviarMensajeCandidato = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { mensaje, entrevista } = req.body;
+        const updateData = {};
+        if (mensaje) updateData.mensaje = mensaje;
+        if (entrevista) updateData.entrevistaFecha = entrevista;
+        const postulacion = await Postulacion.findByIdAndUpdate(id, updateData, { new: true });
+        if (!postulacion) {
+            return res.status(404).json({ error: "Postulación no encontrada" });
+        }
+        res.json({ message: "Mensaje enviado", postulacion });
+    } catch (e) {
+        res.status(500).json({ error: "Error al enviar mensaje" });
+    }
+};
+
 module.exports = {
-    postular
+    posting,
+    getPostulacionesUsuario,
+    getPostulantesVacante,
+    eliminarPostulacion,
+    enviarMensajeCandidato
 };
