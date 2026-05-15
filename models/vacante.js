@@ -12,6 +12,8 @@ const vacanteSchema = new mongoose.Schema({
 
     ubicacion: String,
 
+    descripcion: String,
+
     reclutadorEmail: String,
 
     postulantes: {

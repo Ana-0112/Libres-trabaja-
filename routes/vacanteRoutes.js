@@ -3,24 +3,29 @@ const express = require('express');
 const router = express.Router();
 
 const {
-
     crearVacante,
     getVacantes,
-    getVacantesReclutador
-
+    getVacantesReclutador,
+    eliminarVacante,
+    actualizarVacante,
+    getVacantesFeed,
+    getPostulantesVacante
 } = require('../controllers/vacanteCtrl');
 
-const { postingan, getPostulantesVacante } = require('../controllers/postulacionCtrl');
+const { postular } = require('../controllers/postulacionCtrl');
 
 router.post('/', crearVacante);
 
 router.get('/', getVacantes);
 
+router.get('/feed', getVacantesFeed);
+
 router.get('/reclutador/:email', getVacantesReclutador);
 
-router.post('/postular', postingan);
+router.delete('/:id', eliminarVacante);
 
-// Ruta para obtener postulantes de una vacante (compatibilidad con frontend)
+router.put('/:id', actualizarVacante);
+
 router.get('/postulantes/:vacanteId', getPostulantesVacante);
 
 module.exports = router;

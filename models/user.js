@@ -4,10 +4,16 @@ const userSchema = new mongoose.Schema({
 
     nombre: String,
 
+    apellidos: String,
+
     email: {
         type: String,
         unique: true
     },
+
+    telefono: String,
+
+    password: String,
 
     rol: {
         type: String,
@@ -20,9 +26,9 @@ const userSchema = new mongoose.Schema({
 
     empresa: String,
 
-    telefono: String,
+    ubicacion: String,
 
-    password: String,
+    fotosEmpresa: [String],
 
     fcmToken: {
         type: String,
