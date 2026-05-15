@@ -32,6 +32,11 @@ connectDB();
 
 // ROUTES
 
+// Health check para Render
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Backend funcionando' });
+});
+
 app.use('/api/users', userRoutes);
 
 app.use('/api/vacantes', vacanteRoutes);
