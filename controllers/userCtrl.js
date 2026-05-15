@@ -11,7 +11,9 @@ const login = async (req, res) => {
         if (!user) {
             return res.status(401).json({ error: "Usuario no encontrado" });
         }
-        res.json(user);
+        const response = user.toObject();
+        response.rol = response.rol || 'candidato';
+        res.json(response);
     } catch (e) {
         console.log("ERROR LOGIN:", e);
         res.status(500).json({ error: "Error login" });
@@ -59,18 +61,19 @@ const updatePerfil = async (req, res) => {
 
 const registro = async (req, res) => {
     try {
-        const { nombre, apellidos, email, telefono, password, role, nombreEmpresa, ubicacion } = req.body;
+        const { nombre, apellidos, email, telefono, password, role, rol, nombreEmpresa, ubicacion } = req.body;
         const existe = await User.findOne({ email: email.trim().toLowerCase() });
         if (existe) {
             return res.status(400).json({ error: "El usuario ya existe" });
         }
+        const rolUsuario = role || rol;
         const nuevo = new User({
             nombre: nombre?.trim(),
             apellidos: apellidos?.trim(),
             email: email.trim().toLowerCase(),
             telefono: telefono?.trim(),
             password: password?.trim(),
-            rol: role?.trim() || 'candidato',
+            rol: rolUsuario?.trim()?.toLowerCase() || 'candidato',
             empresa: nombreEmpresa?.trim() || '',
             ubicacion: ubicacion?.trim() || ''
         });
