@@ -12,6 +12,7 @@ const login = async (req, res) => {
             return res.status(401).json({ error: "Usuario no encontrado" });
         }
         const response = user.toObject();
+        delete response.password;
         response.rol = response.rol || 'candidato';
         res.json(response);
     } catch (e) {
