@@ -21,6 +21,18 @@ const uploadArchivo = async (req, res) => {
 
             );
 
+        // Eliminar archivo anterior si se especificó
+        const oldUrl = req.body.oldUrl;
+        if (oldUrl && oldUrl !== result.secure_url) {
+            const match = oldUrl.match(/\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
+            if (match) {
+                const publicId = match[1];
+                const resType = oldUrl.includes('/raw/') ? 'raw' : 'image';
+                await cloudinary.uploader.destroy(publicId, { resource_type: resType })
+                    .catch(() => {});
+            }
+        }
+
         res.json({
             url: result.secure_url
         });
@@ -35,6 +47,30 @@ const uploadArchivo = async (req, res) => {
 
 };
 
+// Generar signed URL para raw files (autenticados → público temporal)
+const getSignedUrl = async (req, res) => {
+    try {
+        const rawUrl = req.query.url;
+        if (!rawUrl) return res.status(400).json({ error: "Falta url" });
+
+        const match = rawUrl.match(/\/raw\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
+        if (!match) return res.status(400).json({ error: "URL inválida" });
+
+        const publicId = match[1];
+        const signedUrl = cloudinary.url(publicId, {
+            resource_type: "raw",
+            type: "upload",
+            sign_url: true,
+            expires_at: Math.floor(Date.now() / 1000) + 3600
+        });
+
+        res.json({ url: signedUrl });
+    } catch (e) {
+        res.status(500).json({ error: "Error al generar URL firmada" });
+    }
+};
+
 module.exports = {
-    uploadArchivo
+    uploadArchivo,
+    getSignedUrl
 };
