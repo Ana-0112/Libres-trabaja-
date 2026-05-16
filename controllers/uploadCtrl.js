@@ -4,14 +4,19 @@ const uploadArchivo = async (req, res) => {
 
     try {
 
+        const data = req.body.data || '';
+
+        // Forzar image para PDFs (raw → 401 en algunos planes de Cloudinary)
+        const isPDF = data.startsWith('data:application/pdf');
+
         const result =
             await cloudinary.uploader.upload(
 
-                req.body.data,
+                data,
 
                 {
                     folder: "libres_trabaja",
-                    resource_type: "auto"
+                    resource_type: isPDF ? "image" : "auto"
                 }
 
             );
