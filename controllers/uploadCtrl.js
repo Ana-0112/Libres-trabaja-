@@ -6,7 +6,6 @@ const uploadArchivo = async (req, res) => {
 
         const data = req.body.data || '';
 
-        // Forzar image para PDFs (raw → 401 en algunos planes de Cloudinary)
         const isPDF = data.startsWith('data:application/pdf');
 
         const result =
@@ -16,7 +15,7 @@ const uploadArchivo = async (req, res) => {
 
                 {
                     folder: "libres_trabaja",
-                    resource_type: isPDF ? "image" : "auto"
+                    resource_type: isPDF ? "raw" : "auto"
                 }
 
             );
@@ -53,7 +52,8 @@ const getSignedUrl = async (req, res) => {
         const rawUrl = req.query.url;
         if (!rawUrl) return res.status(400).json({ error: "Falta url" });
 
-        const match = rawUrl.match(/\/(image|raw)\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
+        const cleanUrl = rawUrl.split('?')[0];
+        const match = cleanUrl.match(/\/(image|raw)\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
         if (!match) return res.status(400).json({ error: "URL inválida" });
 
         const resourceType = match[1];
