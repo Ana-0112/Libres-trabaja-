@@ -12,9 +12,11 @@ const {
     getPostulantesVacante
 } = require('../controllers/vacanteCtrl');
 
-const { postular } = require('../controllers/postulacionCtrl');
+const { posting } = require('../controllers/postulacionCtrl');
 
 router.post('/', crearVacante);
+
+router.post('/postular', posting);
 
 router.get('/', getVacantes);
 
