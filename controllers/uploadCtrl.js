@@ -47,18 +47,19 @@ const uploadArchivo = async (req, res) => {
 
 };
 
-// Generar signed URL para raw files (autenticados → público temporal)
+// Generar signed URL para files que requieren autenticación
 const getSignedUrl = async (req, res) => {
     try {
         const rawUrl = req.query.url;
         if (!rawUrl) return res.status(400).json({ error: "Falta url" });
 
-        const match = rawUrl.match(/\/raw\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
+        const match = rawUrl.match(/\/(image|raw)\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
         if (!match) return res.status(400).json({ error: "URL inválida" });
 
-        const publicId = match[1];
+        const resourceType = match[1];
+        const publicId = match[2];
         const signedUrl = cloudinary.url(publicId, {
-            resource_type: "raw",
+            resource_type: resourceType,
             type: "upload",
             sign_url: true,
             expires_at: Math.floor(Date.now() / 1000) + 3600
