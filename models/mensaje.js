@@ -10,6 +10,8 @@ const mensajeSchema = new mongoose.Schema({
 
     texto: String,
 
+    time: String,
+
     fecha: {
         type: Date,
         default: Date.now

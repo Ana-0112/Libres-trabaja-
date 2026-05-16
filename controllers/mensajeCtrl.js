@@ -22,7 +22,7 @@ const getMensajes = async (req, res) => {
             emisor: m.emisor,
             receptor: m.receptor,
             texto: m.texto,
-            time: m.fecha ? new Date(m.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '',
+            time: m.time || (m.fecha ? new Date(m.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''),
             fecha: m.fecha
         }));
 
@@ -34,7 +34,7 @@ const getMensajes = async (req, res) => {
 
 const enviarMensaje = async (req, res) => {
     try {
-        const { vacanteId, emisor, receptor, texto } = req.body;
+        const { vacanteId, emisor, receptor, texto, time } = req.body;
         const emisorLower = emisor.toLowerCase().trim();
         const receptorLower = receptor.toLowerCase().trim();
 
@@ -42,7 +42,8 @@ const enviarMensaje = async (req, res) => {
             vacanteId,
             emisor: emisorLower,
             receptor: receptorLower,
-            texto
+            texto,
+            time
         });
 
         await nuevo.save();
@@ -88,7 +89,7 @@ const obtenerMensajesSimple = async (req, res) => {
             emisor: m.emisor,
             receptor: m.receptor,
             texto: m.texto,
-            time: m.fecha ? new Date(m.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '',
+            time: m.time || (m.fecha ? new Date(m.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''),
             fecha: m.fecha
         }));
 
