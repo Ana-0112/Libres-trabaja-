@@ -71,7 +71,25 @@ const getSignedUrl = async (req, res) => {
     }
 };
 
+const deleteArchivo = async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: "Falta url" });
+
+        const match = url.match(/\/upload\/v\d+\/(.+?)(\.[^/.]+)?$/);
+        if (!match) return res.status(400).json({ error: "URL inválida" });
+
+        const publicId = match[1];
+        const resType = url.includes('/raw/') ? 'raw' : 'image';
+        await cloudinary.uploader.destroy(publicId, { resource_type: resType });
+        res.json({ message: "Archivo eliminado" });
+    } catch (e) {
+        res.status(500).json({ error: "Error al eliminar archivo" });
+    }
+};
+
 module.exports = {
     uploadArchivo,
-    getSignedUrl
+    getSignedUrl,
+    deleteArchivo
 };

@@ -4,10 +4,12 @@ const router = express.Router();
 
 const {
     uploadArchivo,
-    getSignedUrl
+    getSignedUrl,
+    deleteArchivo
 } = require('../controllers/uploadCtrl');
 
 router.post('/', uploadArchivo);
 router.get('/signed', getSignedUrl);
+router.post('/delete', deleteArchivo);
 
 module.exports = router;
