@@ -55,7 +55,7 @@ const enviarMensaje = async (req, res) => {
                     await admin.messaging().send({
                         token: receptorUser.fcmToken,
                         notification: {
-                            title: "Nuevo mensaje 💬",
+                            title: "Nuevo mensaje",
                             body: texto
                         }
                     });
