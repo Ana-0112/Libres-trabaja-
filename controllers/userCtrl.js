@@ -23,10 +23,10 @@ const login = async (req, res) => {
 
 const guardarToken = async (req, res) => {
     try {
-        const { email, token } = req.body;
+        const { email, fcmToken } = req.body;
         await User.findOneAndUpdate(
             { email: email.trim().toLowerCase() },
-            { $set: { fcmToken: token } },
+            { $set: { fcmToken: fcmToken } },
             { new: true }
         );
         res.json({ message: "Token guardado" });
